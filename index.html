@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.120 — diagnostico camera</title>
+<title>Runecast v3.121 — modelo centralizado</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10890,16 +10890,7 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.115: TRAVA a posição base a cada frame. As animações Walking/Running
-      // do Meshy têm "root motion" (deslocam o personagem), o que o fazia sair
-      // do quadro e "piscar". Aqui forçamos X/Z fixos; deixamos só um bob de Y.
-      if (model.basePos) {
-        model.root.position.x = model.basePos.x;
-        model.root.position.z = model.basePos.z;
-        model.root.position.y = model.basePos.y;
-      }
-
-      // orientação por facing (v3.116: ângulo menor = mais de frente)
+      // orientação por facing (ângulo leve = mais de frente)
       const facing = e.facing || 1;
       const targetRotY = facing < 0 ? -0.25 : 0.25;
       model.root.rotation.y += (targetRotY - model.root.rotation.y) * 0.15;
