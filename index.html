@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.122 — centralizacao forcada</title>
+<title>Runecast v3.123 — camera segue modelo</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10763,9 +10763,10 @@ const RUNECAST_3D = (function () {
     loader.load(url, (gltf) => {
       try {
         const root = gltf.scene;
-        // v3.122: CENTRALIZAÇÃO FORÇADA NO CÓDIGO — funciona com qualquer .glb,
-        // mesmo o antigo descentralizado. Usa measureReal para pegar o tamanho
-        // verdadeiro (imune à escala de Armature) e reposiciona na origem.
+        // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
+        // Hips e mexer nisso quebra). Em vez disso, mede ONDE o modelo está e
+        // aponta a câmera para lá. Infalível: seja qual for a posição, a câmera
+        // enquadra. measureReal lê a posição/tamanho real renderizado.
         function measureReal(obj) {
           obj.updateWorldMatrix(true, true);
           const b = new THREE.Box3(); let f = false;
@@ -10779,30 +10780,29 @@ const RUNECAST_3D = (function () {
           });
           return f ? b : null;
         }
-        // 1) normaliza altura para 2 unidades
+        // 1) normaliza altura para ~2 unidades (mantém proporção)
         let m = measureReal(root);
         let sz = new THREE.Vector3(); m.getSize(sz);
         const s = 2.0 / (sz.y || 1);
         root.scale.multiplyScalar(s);
-        // 2) re-mede e FORÇA para a origem (centro X/Z, pés em Y=0)
-        m = measureReal(root);
-        const ctr = new THREE.Vector3(); m.getCenter(ctr);
-        root.position.x -= ctr.x;
-        root.position.z -= ctr.z;
-        root.position.y -= m.min.y;
 
-        // ENQUADRAMENTO: câmera calculada pelo tamanho real (measureReal)
+        // 2) mede a posição REAL (centro) já escalado e aponta a câmera pra lá
         const fb = measureReal(root);
         const fsize = new THREE.Vector3(); fb.getSize(fsize);
         const fcenter = new THREE.Vector3(); fb.getCenter(fcenter);
         const maxDim = Math.max(fsize.x, fsize.y);
         const fov = camera.fov * (Math.PI / 180);
         const dist = (maxDim / 2) / Math.tan(fov / 2) * FRAME_MARGIN;
+        // câmera posicionada relativa ao CENTRO REAL do modelo (onde quer que esteja)
         camera.position.set(fcenter.x, fcenter.y, fcenter.z + dist);
         camera.lookAt(fcenter.x, fcenter.y, fcenter.z);
         camera.updateProjectionMatrix();
-        console.log('[3d] enquadrado: altura=', fsize.y.toFixed(2),
-                    'maxDim=', maxDim.toFixed(2));
+        // guarda o centro para reapontar a câmera todo frame (a animação pode
+        // mover o centro pelo root motion)
+        const camTarget = fcenter.clone();
+        const camDist = dist;
+        console.log('[3d] enquadrado: centro=', fcenter.toArray().map(n=>n.toFixed(1)),
+                    'altura=', fsize.y.toFixed(2));
 
         let mixer = null; const actions = {};
         let firstAction = null;
@@ -10817,9 +10817,8 @@ const RUNECAST_3D = (function () {
         api.models[heroKey] = {
           root, mixer, actions, animations: gltf.animations || [],
           currentAction: firstAction, currentState: null,
-          // v3.115: posição-base para travar contra "root motion" (animações
-          // que deslocam o personagem fazendo ele sair do quadro)
-          basePos: { x: root.position.x, y: root.position.y, z: root.position.z }
+          // v3.123: alvo e distância da câmera (medidos na posição real do modelo)
+          camTarget: camTarget, camDist: camDist
         };
         api.loadState[heroKey] = 'ready';
         console.log('[3d]', heroKey, 'carregado:',
@@ -10931,6 +10930,15 @@ const RUNECAST_3D = (function () {
       for (const k in api.models) {
         const m = api.models[k];
         if (m && m.root) m.root.visible = (m === model);
+      }
+
+      // v3.123: reaponta a câmera para o alvo deste modelo (cada modelo tem o
+      // seu, medido na carga). Garante que a câmera sempre enquadra o mago,
+      // mesmo com a cena/câmera compartilhada entre entidades.
+      if (model.camTarget) {
+        camera.position.set(model.camTarget.x, model.camTarget.y, model.camTarget.z + model.camDist);
+        camera.lookAt(model.camTarget.x, model.camTarget.y, model.camTarget.z);
+        camera.updateProjectionMatrix();
       }
 
       renderer.render(scene, camera);
