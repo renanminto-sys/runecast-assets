@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.112 — Mago 3D (escala Armature corrigida)</title>
+<title>Runecast v3.113 — Mago 3D (escala corrigida no modelo)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10763,46 +10763,30 @@ const RUNECAST_3D = (function () {
     loader.load(url, (gltf) => {
       try {
         const root = gltf.scene;
-        // v3.112: mede o tamanho REAL renderizado percorrendo a geometria com
-        // a matrix do mundo de cada mesh. Resolve o bug do Meshy em que o nó
-        // 'Armature' tem scale 0.01, enganando Box3.setFromObject e fazendo o
-        // personagem aparecer 100x maior ("braço gigante").
-        function measureReal(obj) {
-          obj.updateWorldMatrix(true, true);
-          const bb = new THREE.Box3(); let found = false;
-          obj.traverse(o => {
-            if ((o.isMesh || o.isSkinnedMesh) && o.geometry) {
-              o.geometry.computeBoundingBox();
-              const gb = o.geometry.boundingBox.clone();
-              gb.applyMatrix4(o.matrixWorld);
-              bb.union(gb); found = true;
-            }
-          });
-          return found ? bb : null;
-        }
-
-        // 1) mede tamanho real, 2) normaliza p/ altura 2, 3) ancora pés
-        let bb = measureReal(root);
-        const size = new THREE.Vector3(); bb.getSize(size);
+        // v3.113: modelo já vem com escala correta (corrigida no Blender — o
+        // Armature de scale 0.01 do Meshy foi achatado). Por isso a medição
+        // padrão funciona e a normalização é simples.
+        const box = new THREE.Box3().setFromObject(root);
+        const size = new THREE.Vector3(); box.getSize(size);
         const s = 2.0 / (size.y || 1);
         root.scale.multiplyScalar(s);
-        bb = measureReal(root);
+        const bb = new THREE.Box3().setFromObject(root);
         root.position.y -= bb.min.y;
         root.position.x -= (bb.min.x + bb.max.x) / 2;
         root.position.z -= (bb.min.z + bb.max.z) / 2;
 
-        // ENQUADRAMENTO: câmera calculada pelo tamanho real normalizado
-        bb = measureReal(root);
-        const fsize = new THREE.Vector3(); bb.getSize(fsize);
-        const fcenter = new THREE.Vector3(); bb.getCenter(fcenter);
+        // ENQUADRAMENTO: câmera calculada pelo tamanho normalizado
+        const fb = new THREE.Box3().setFromObject(root);
+        const fsize = new THREE.Vector3(); fb.getSize(fsize);
+        const fcenter = new THREE.Vector3(); fb.getCenter(fcenter);
         const maxDim = Math.max(fsize.x, fsize.y);
         const fov = camera.fov * (Math.PI / 180);
         const dist = (maxDim / 2) / Math.tan(fov / 2) * FRAME_MARGIN;
         camera.position.set(fcenter.x, fcenter.y, fcenter.z + dist);
         camera.lookAt(fcenter.x, fcenter.y, fcenter.z);
         camera.updateProjectionMatrix();
-        console.log('[3d] enquadrado (real): altura=', fsize.y.toFixed(2),
-                    'maxDim=', maxDim.toFixed(2), 'cam.z=', (fcenter.z + dist).toFixed(2));
+        console.log('[3d] enquadrado: altura=', fsize.y.toFixed(2),
+                    'maxDim=', maxDim.toFixed(2));
 
         let mixer = null; const actions = {};
         if (gltf.animations && gltf.animations.length) {
