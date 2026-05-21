@@ -1,84 +1,63 @@
 <!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Teste 3D v3</title>
+<title>Teste 3D v4</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%}
+  *{margin:0;padding:0;box-sizing:border-box}html,body{height:100%}
   body{background:#1a0e2e;color:#fff;font-family:-apple-system,sans-serif;overflow:hidden}
   #ver{position:fixed;top:0;left:0;right:0;background:#00c853;color:#000;font-weight:bold;text-align:center;padding:5px;z-index:100;font-size:13px}
-  #stage{position:fixed;top:28px;left:0;right:0;bottom:170px;background:repeating-linear-gradient(45deg,#241640,#241640 20px,#2a1a4a 20px,#2a1a4a 40px)}
+  #stage{position:fixed;top:28px;left:0;right:0;bottom:140px;background:repeating-linear-gradient(45deg,#241640,#241640 20px,#2a1a4a 20px,#2a1a4a 40px)}
   #stage canvas{display:block}
-  #panel{position:fixed;left:0;right:0;bottom:0;height:170px;padding:8px 12px;background:#190a2d;overflow-y:auto}
-  .row{margin:6px 0;display:flex;align-items:center;gap:8px}
-  .row label{flex:0 0 90px;font-size:12px;color:#ce93d8}
-  .row input{flex:1}
-  .row .val{flex:0 0 46px;text-align:right;font-size:12px}
-  #log{font-size:11px;color:#9c88c4;background:rgba(0,0,0,.35);padding:6px;border-radius:6px;margin-top:6px;white-space:pre-wrap;font-family:monospace;line-height:1.35}
+  #panel{position:fixed;left:0;right:0;bottom:0;height:140px;padding:8px 12px;background:#190a2d;overflow-y:auto}
   #anims{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
   #anims button{background:#4a2d6e;color:#fff;border:1px solid #7e57c2;padding:5px 9px;border-radius:13px;font-size:11px}
+  #log{font-size:11px;color:#9c88c4;background:rgba(0,0,0,.35);padding:6px;border-radius:6px;margin-top:6px;white-space:pre-wrap;font-family:monospace;line-height:1.35}
 </style></head><body>
-<div id="ver">v3 — carregando...</div>
+<div id="ver">v4 — carregando...</div>
 <div id="stage"></div>
-<div id="panel">
-  <div class="row"><label>Distância câmera</label><input type="range" id="dist" min="0.5" max="20" step="0.1" value="6"><span class="val" id="dist_v">6.0</span></div>
-  <div class="row"><label>Altura olhar</label><input type="range" id="ly" min="-2" max="4" step="0.1" value="1.0"><span class="val" id="ly_v">1.0</span></div>
-  <div id="anims"></div>
-  <div id="log">iniciando...</div>
-</div>
+<div id="panel"><div id="anims"></div><div id="log">iniciando...</div></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 const MODEL_URL="mago_otimizado.glb";
 const ver=document.getElementById("ver"),log=document.getElementById("log"),stage=document.getElementById("stage");
-let RW=stage.clientWidth,RH=stage.clientHeight;
-let renderer,scene,camera,controls,model,mixer,actions={},current;
-const P={dist:6,ly:1.0};
-function applyCam(){if(!camera)return;camera.position.set(0,P.ly,P.dist);if(controls){controls.target.set(0,P.ly,0);controls.update();}else{camera.lookAt(0,P.ly,0);}camera.updateProjectionMatrix();}
+let RW=stage.clientWidth,RH=stage.clientHeight,renderer,scene,camera,controls,model,mixer,actions={},current;
 try{
   if(!window.THREE){ver.textContent="ERRO: Three.js nao carregou";ver.style.background="#ff5252";throw 0;}
-  ver.textContent="v3 — Three OK, carregando modelo...";
   renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
   renderer.setPixelRatio(devicePixelRatio);renderer.setSize(RW,RH);renderer.setClearColor(0,0);
   if(THREE.sRGBEncoding!==undefined)renderer.outputEncoding=THREE.sRGBEncoding;
   stage.appendChild(renderer.domElement);
   scene=new THREE.Scene();
   camera=new THREE.PerspectiveCamera(35,RW/RH,0.01,1000);
+  camera.position.set(0,1.0,3.5);
   scene.add(new THREE.AmbientLight(0xffffff,.9));
   const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(2,5,3);scene.add(dl);
-  if(THREE.OrbitControls){controls=new THREE.OrbitControls(camera,renderer.domElement);}
-  applyCam();
-  // eixo de referencia: cubo de 1 unidade na origem pra comparar tamanho
+  if(THREE.OrbitControls){controls=new THREE.OrbitControls(camera,renderer.domElement);controls.target.set(0,0.9,0);controls.update();}
+  // cubo verde de 1 unidade como regua
   const ref=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x00ff00,wireframe:true}));
-  ref.position.y=0.5;scene.add(ref);
+  ref.position.set(1.2,0.5,0);scene.add(ref);
   new THREE.GLTFLoader().load(MODEL_URL,(gltf)=>{
-    model=gltf.scene;scene.add(model);
-    // mede CRU (sem mexer em nada)
-    function measure(o){o.updateWorldMatrix(true,true);const bb=new THREE.Box3();let f=false;
-      o.traverse(c=>{if((c.isMesh||c.isSkinnedMesh)&&c.geometry){c.geometry.computeBoundingBox();
-        const g=c.geometry.boundingBox.clone();g.applyMatrix4(c.matrixWorld);bb.union(g);f=true;}});return f?bb:null;}
-    let bb=measure(model);let sz=new THREE.Vector3();bb.getSize(sz);
-    const rawY=sz.y;
-    // normaliza p/ altura 1.7 (humano), ancora pes em 0
-    const sf=1.7/(sz.y||1);model.scale.multiplyScalar(sf);
-    bb=measure(model);model.position.y-=bb.min.y;model.position.x-=(bb.min.x+bb.max.x)/2;model.position.z-=(bb.min.z+bb.max.z)/2;
-    bb=measure(model);sz=new THREE.Vector3();bb.getSize(sz);
+    model=gltf.scene;
+    // medicao SIMPLES (agora funciona, modelo corrigido)
+    const box=new THREE.Box3().setFromObject(model);
+    const sz=new THREE.Vector3();box.getSize(sz);
+    // ancora pes em y=0
+    model.position.y-=box.min.y;
+    scene.add(model);
     mixer=new THREE.AnimationMixer(model);
     const ab=document.getElementById("anims");
     gltf.animations.forEach((c,i)=>{actions[c.name]=mixer.clipAction(c);
       const b=document.createElement("button");b.textContent=c.name;
       b.onclick=()=>{if(current)current.fadeOut(.2);const a=actions[c.name];a.reset().fadeIn(.2).play();current=a;};
       ab.appendChild(b);if(i===0)b.click();});
-    ver.textContent="v3 — MODELO OK";ver.style.background="#00c853";
-    log.textContent="O CUBO VERDE tem 1 unidade (altura de ref).\nO mago deve ter ~1.7x a altura do cubo.\n\nbruto medido y="+rawY.toFixed(4)+"\napos normalizar p/ 1.7: y="+sz.y.toFixed(2)+" x="+sz.x.toFixed(2)+"\n\nUse o dedo p/ girar/zoom. Ajuste a distancia.";
-  },(p)=>{if(p.total)ver.textContent="v3 — baixando "+Math.round(p.loaded/p.total*100)+"%";},
+    ver.textContent="v4 — MODELO OK";ver.style.background="#00c853";
+    log.textContent="Cubo verde = 1 unidade (regua, ao lado direito).\nO mago deve ter ~1.7x a altura do cubo.\n\nTamanho medido do mago: altura="+sz.y.toFixed(2)+" largura="+sz.x.toFixed(2)+"\n>>> Se altura ~1.7, ESTA CORRETO!\n\nGire/zoom com o dedo.";
+  },(p)=>{if(p.total)ver.textContent="v4 — baixando "+Math.round(p.loaded/p.total*100)+"%";},
   (e)=>{ver.textContent="ERRO ao carregar modelo";ver.style.background="#ff5252";log.textContent="Falha: "+e;});
   const clock=new THREE.Clock();
   (function loop(){requestAnimationFrame(loop);if(mixer)mixer.update(clock.getDelta());if(controls)controls.update();if(renderer)renderer.render(scene,camera);})();
   addEventListener("resize",()=>{RW=stage.clientWidth;RH=stage.clientHeight;camera.aspect=RW/RH;camera.updateProjectionMatrix();renderer.setSize(RW,RH);});
 }catch(e){if(log)log.textContent="ERRO FATAL: "+e;}
-function bind(id,k,f){const el=document.getElementById(id),v=document.getElementById(id+"_v");
-  el.oninput=()=>{P[k]=parseFloat(el.value);v.textContent=f?f(P[k]):P[k];applyCam();};}
-bind("dist","dist",x=>x.toFixed(1));bind("ly","ly",x=>x.toFixed(1));
 </script></body></html>
