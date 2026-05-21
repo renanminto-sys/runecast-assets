@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.121 — modelo centralizado</title>
+<title>Runecast v3.122 — centralizacao forcada</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10763,20 +10763,36 @@ const RUNECAST_3D = (function () {
     loader.load(url, (gltf) => {
       try {
         const root = gltf.scene;
-        // v3.113: modelo já vem com escala correta (corrigida no Blender — o
-        // Armature de scale 0.01 do Meshy foi achatado). Por isso a medição
-        // padrão funciona e a normalização é simples.
-        const box = new THREE.Box3().setFromObject(root);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const s = 2.0 / (size.y || 1);
+        // v3.122: CENTRALIZAÇÃO FORÇADA NO CÓDIGO — funciona com qualquer .glb,
+        // mesmo o antigo descentralizado. Usa measureReal para pegar o tamanho
+        // verdadeiro (imune à escala de Armature) e reposiciona na origem.
+        function measureReal(obj) {
+          obj.updateWorldMatrix(true, true);
+          const b = new THREE.Box3(); let f = false;
+          obj.traverse(o => {
+            if ((o.isMesh || o.isSkinnedMesh) && o.geometry) {
+              o.geometry.computeBoundingBox();
+              const gb = o.geometry.boundingBox.clone();
+              gb.applyMatrix4(o.matrixWorld);
+              b.union(gb); f = true;
+            }
+          });
+          return f ? b : null;
+        }
+        // 1) normaliza altura para 2 unidades
+        let m = measureReal(root);
+        let sz = new THREE.Vector3(); m.getSize(sz);
+        const s = 2.0 / (sz.y || 1);
         root.scale.multiplyScalar(s);
-        const bb = new THREE.Box3().setFromObject(root);
-        root.position.y -= bb.min.y;
-        root.position.x -= (bb.min.x + bb.max.x) / 2;
-        root.position.z -= (bb.min.z + bb.max.z) / 2;
+        // 2) re-mede e FORÇA para a origem (centro X/Z, pés em Y=0)
+        m = measureReal(root);
+        const ctr = new THREE.Vector3(); m.getCenter(ctr);
+        root.position.x -= ctr.x;
+        root.position.z -= ctr.z;
+        root.position.y -= m.min.y;
 
-        // ENQUADRAMENTO: câmera calculada pelo tamanho normalizado
-        const fb = new THREE.Box3().setFromObject(root);
+        // ENQUADRAMENTO: câmera calculada pelo tamanho real (measureReal)
+        const fb = measureReal(root);
         const fsize = new THREE.Vector3(); fb.getSize(fsize);
         const fcenter = new THREE.Vector3(); fb.getCenter(fcenter);
         const maxDim = Math.max(fsize.x, fsize.y);
