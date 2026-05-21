@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.115 — root motion travado</title>
+<title>Runecast v3.117 — delta por modelo (fix animacao)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10827,7 +10827,18 @@ const RUNECAST_3D = (function () {
     const clipName = resolveClip(model, state);
     if (!clipName) return;
     const action = model.mixer.clipAction(model.actions[clipName]);
+
+    // v3.116: se o novo clip é o MESMO da ação atual (vários estados mapeiam
+    // para 'Walking'), não faz cross-fade contra si mesmo (isso zerava o peso
+    // e fazia o mago sumir). Só ajusta velocidade e mantém tocando.
+    if (model.currentAction && model.currentAction.getClip() === action.getClip()) {
+      action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
+      return;
+    }
+
     action.reset();
+    action.enabled = true;
+    action.setEffectiveWeight(1);
     if (ONCE_STATES[state]) {
       action.setLoop(THREE.LoopOnce, 1);
       action.clampWhenFinished = true;
@@ -10836,9 +10847,10 @@ const RUNECAST_3D = (function () {
       action.clampWhenFinished = false;
     }
     action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
-    action.fadeIn(0.2).play();
+    action.play();
     if (model.currentAction && model.currentAction !== action) {
-      model.currentAction.fadeOut(0.2);
+      // cross-fade suave da ação anterior para a nova
+      action.crossFadeFrom(model.currentAction, 0.2, false);
     }
     model.currentAction = action;
   }
@@ -10854,7 +10866,16 @@ const RUNECAST_3D = (function () {
     const model = api.models[heroKey];
     if (!model || api.loadState[heroKey] !== 'ready') { window.__dbg3d.ret='loadState='+api.loadState[heroKey]; return false; }
     try {
-      const dt = Math.min(clock.getDelta(), 0.05);
+      // v3.117 CORREÇÃO CRÍTICA: clock.getDelta() era chamado 1x por entidade
+      // (player E bot) por frame. A 1ª chamada consumia o tempo e a 2ª (do
+      // player AELAR) recebia ~0 -> mixer.update(0) nunca avançava a animação,
+      // deixando o SkinnedMesh numa pose degenerada (sumia). Só "piscava" no
+      // frame da troca de estado (action.reset). Agora cada modelo tem seu
+      // próprio relógio independente via performance.now().
+      const tnow = performance.now();
+      if (!model._lastT) model._lastT = tnow;
+      const dt = Math.min((tnow - model._lastT) / 1000, 0.05);
+      model._lastT = tnow;
       const state = getState ? getState(e) : 'idle';
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
@@ -10868,10 +10889,9 @@ const RUNECAST_3D = (function () {
         model.root.position.y = model.basePos.y;
       }
 
-      // orientação por facing (v3.115: correção — 'walking_back' no jogo
-      // corresponde a andar para FRENTE/cima, então não viramos de costas)
+      // orientação por facing (v3.116: ângulo menor = mais de frente)
       const facing = e.facing || 1;
-      const targetRotY = facing < 0 ? -0.4 : 0.4;
+      const targetRotY = facing < 0 ? -0.25 : 0.25;
       model.root.rotation.y += (targetRotY - model.root.rotation.y) * 0.15;
 
       // fallback procedural (caso modelo não tenha mixer)
