@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.124 — modelo correto (Character)</title>
+<title>Runecast v3.126 — modelo certo + 7 animacoes</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -11943,7 +11943,15 @@ function drawEntityBars(e, charX, charY) {
   const barH = 5;
   const gap = 2;
   // 18 = HP bar height + mana crystals row above the character
-  const offsetY = -(PLAYER_RADIUS + 18);
+  // v3.125: se a entidade usa modelo 3D (mais alto que o sprite 2D), sobe a
+  // barra para ficar acima da cabeça do mago 3D, não no meio do corpo.
+  let extraUp = 0;
+  if (typeof RUNECAST_3D !== 'undefined' && RUNECAST_3D.config &&
+      RUNECAST_3D.config.HERO_3D_MODELS[e.heroKey] &&
+      RUNECAST_3D.state.available) {
+    extraUp = 95; // sobe a barra ~altura do mago 3D
+  }
+  const offsetY = -(PLAYER_RADIUS + 18 + extraUp);
   const barX = charX - barW / 2;
   const barY = charY + offsetY;
   
