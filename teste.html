@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Teste 3D</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#1a0e2e;color:#fff;font-family:-apple-system,sans-serif;overflow:hidden;height:100vh}
+  #ver{position:fixed;top:0;left:0;right:0;background:#00c853;color:#000;font-weight:bold;text-align:center;padding:6px;z-index:100;font-size:15px}
+  #stage{position:relative;width:100vw;height:50vh;margin-top:34px;background:repeating-linear-gradient(45deg,#241640,#241640 20px,#2a1a4a 20px,#2a1a4a 40px)}
+  #stage canvas{position:absolute;top:0;left:0}
+  #marker::before{content:"";position:absolute;left:calc(50% - 50px);top:50%;width:100px;height:1px;background:rgba(255,80,80,.7)}
+  #marker::after{content:"";position:absolute;top:calc(50% - 120px);left:50%;width:1px;height:240px;background:rgba(255,80,80,.7)}
+  #panel{padding:10px 14px;height:calc(50vh - 34px);overflow-y:auto}
+  .row{margin:8px 0;display:flex;align-items:center;gap:8px}
+  .row label{flex:0 0 110px;font-size:12px;color:#ce93d8}
+  .row input{flex:1}
+  .row .val{flex:0 0 50px;text-align:right;font-size:12px}
+  #log{font-size:11px;color:#9c88c4;background:rgba(0,0,0,.35);padding:8px;border-radius:8px;margin-top:8px;white-space:pre-wrap;font-family:monospace;line-height:1.4}
+  #anims{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  #anims button{background:#4a2d6e;color:#fff;border:1px solid #7e57c2;padding:6px 10px;border-radius:14px;font-size:11px}
+</style></head><body>
+<div id="ver">TESTE v2 — carregando...</div>
+<div id="stage"><div id="marker"></div></div>
+<div id="panel">
+  <div class="row"><label>Tamanho px</label><input type="range" id="th" min="40" max="400" value="130"><span class="val" id="th_v">130</span></div>
+  <div class="row"><label>Zoom</label><input type="range" id="mg" min="0.8" max="3" step="0.05" value="1.35"><span class="val" id="mg_v">1.35</span></div>
+  <div class="row"><label>Altura olhar</label><input type="range" id="ly" min="0" max="2" step="0.05" value="1.0"><span class="val" id="ly_v">1.00</span></div>
+  <div id="anims"></div>
+  <div id="log">iniciando...</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+const MODEL_URL="mago_otimizado.glb";
+const ver=document.getElementById("ver"), log=document.getElementById("log");
+const stage=document.getElementById("stage");
+const RW=stage.clientWidth, RH=stage.clientHeight;
+let renderer,scene,camera,model,mixer,actions={},current,fcenter,maxDim;
+const P={th:130,mg:1.35,ly:1.0};
+function measureReal(obj){
+  obj.updateWorldMatrix(true,true);
+  const bb=new THREE.Box3();let f=false;
+  obj.traverse(o=>{if((o.isMesh||o.isSkinnedMesh)&&o.geometry){o.geometry.computeBoundingBox();
+    const gb=o.geometry.boundingBox.clone();gb.applyMatrix4(o.matrixWorld);bb.union(gb);f=true;}});
+  return f?bb:null;
+}
+function reframe(){if(!model)return;const fov=camera.fov*Math.PI/180;
+  const d=(maxDim/2)/Math.tan(fov/2)*P.mg;
+  camera.position.set(fcenter.x,P.ly,fcenter.z+d);camera.lookAt(fcenter.x,P.ly,fcenter.z);camera.updateProjectionMatrix();}
+try{
+  if(!window.THREE){ver.textContent="ERRO: Three.js nao carregou (CDN)";ver.style.background="#ff5252";throw new Error("no THREE");}
+  ver.textContent="TESTE v2 — Three.js OK, carregando modelo...";
+  renderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
+  renderer.setPixelRatio(devicePixelRatio);renderer.setSize(RW,RH);renderer.setClearColor(0,0);
+  if(THREE.sRGBEncoding!==undefined)renderer.outputEncoding=THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(35,RW/RH,0.1,100);
+  scene.add(new THREE.AmbientLight(0xffffff,0.9));
+  const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(2,5,3);scene.add(dl);
+  const rl=new THREE.DirectionalLight(0x88aaff,.4);rl.position.set(-3,2,-2);scene.add(rl);
+  new THREE.GLTFLoader().load(MODEL_URL,(gltf)=>{
+    model=gltf.scene;scene.add(model);
+    let bb=measureReal(model);const sz=new THREE.Vector3();bb.getSize(sz);
+    const raw=sz.y;
+    const sf=2/(sz.y||1);model.scale.multiplyScalar(sf);
+    bb=measureReal(model);model.position.y-=bb.min.y;
+    model.position.x-=(bb.min.x+bb.max.x)/2;model.position.z-=(bb.min.z+bb.max.z)/2;
+    bb=measureReal(model);const fs=new THREE.Vector3();bb.getSize(fs);
+    fcenter=new THREE.Vector3();bb.getCenter(fcenter);maxDim=Math.max(fs.x,fs.y);
+    mixer=new THREE.AnimationMixer(model);
+    const ab=document.getElementById("anims");
+    gltf.animations.forEach((c,i)=>{actions[c.name]=mixer.clipAction(c);
+      const b=document.createElement("button");b.textContent=c.name;
+      b.onclick=()=>{if(current)current.fadeOut(.2);const a=actions[c.name];a.reset().fadeIn(.2).play();current=a;};
+      ab.appendChild(b);if(i===0)b.click();});
+    ver.textContent="TESTE v2 — MODELO OK";ver.style.background="#00c853";
+    log.textContent="altura bruta medida="+raw.toFixed(4)+"\nfator escala="+sf.toFixed(1)+"x\napos normalizar: y="+fs.y.toFixed(2)+" maxDim="+maxDim.toFixed(2)+"\n>>> y deve ser ~2.00";
+    reframe();
+  },(p)=>{ver.textContent="TESTE v2 — baixando modelo "+(p.total?Math.round(p.loaded/p.total*100):"?")+"%";},
+  (err)=>{ver.textContent="ERRO ao carregar modelo";ver.style.background="#ff5252";log.textContent="Falha no modelo (CORS/rede): "+err;});
+  const clock=new THREE.Clock();
+  (function loop(){requestAnimationFrame(loop);if(mixer)mixer.update(clock.getDelta());if(renderer)renderer.render(scene,camera);})();
+}catch(e){log.textContent="ERRO FATAL: "+e.message;}
+function bind(id,k,f){const el=document.getElementById(id),v=document.getElementById(id+"_v");
+  el.oninput=()=>{P[k]=parseFloat(el.value);v.textContent=f?f(P[k]):P[k];reframe();};}
+bind("th","th");bind("mg","mg",x=>x.toFixed(2));bind("ly","ly",x=>x.toFixed(2));
+</script></body></html>
