@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.114 — debug 3D</title>
+<title>Runecast v3.115 — root motion travado</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10795,7 +10795,10 @@ const RUNECAST_3D = (function () {
         }
         api.models[heroKey] = {
           root, mixer, actions, animations: gltf.animations || [],
-          currentAction: null, currentState: null
+          currentAction: null, currentState: null,
+          // v3.115: posição-base para travar contra "root motion" (animações
+          // que deslocam o personagem fazendo ele sair do quadro)
+          basePos: { x: root.position.x, y: root.position.y, z: root.position.z }
         };
         api.loadState[heroKey] = 'ready';
         console.log('[3d]', heroKey, 'carregado:',
@@ -10856,10 +10859,19 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // orientação por facing
+      // v3.115: TRAVA a posição base a cada frame. As animações Walking/Running
+      // do Meshy têm "root motion" (deslocam o personagem), o que o fazia sair
+      // do quadro e "piscar". Aqui forçamos X/Z fixos; deixamos só um bob de Y.
+      if (model.basePos) {
+        model.root.position.x = model.basePos.x;
+        model.root.position.z = model.basePos.z;
+        model.root.position.y = model.basePos.y;
+      }
+
+      // orientação por facing (v3.115: correção — 'walking_back' no jogo
+      // corresponde a andar para FRENTE/cima, então não viramos de costas)
       const facing = e.facing || 1;
-      const goingBack = state === 'walking_back' || state === 'idle_back';
-      const targetRotY = goingBack ? Math.PI : (facing < 0 ? -0.4 : 0.4);
+      const targetRotY = facing < 0 ? -0.4 : 0.4;
       model.root.rotation.y += (targetRotY - model.root.rotation.y) * 0.15;
 
       // fallback procedural (caso modelo não tenha mixer)
