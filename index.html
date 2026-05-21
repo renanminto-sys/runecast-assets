@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.113 — Mago 3D (escala corrigida no modelo)</title>
+<title>Runecast v3.114 — debug 3D</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10842,12 +10842,14 @@ const RUNECAST_3D = (function () {
 
   // ---- RENDER POR FRAME --------------------------------------------
   function draw3DMage(ctx, e, charX, charY, getState) {
-    if (!api.enabled || !api.available) return false;
+    window.__dbg3d = window.__dbg3d || {calls:0, ok:0, ret:'', err:''};
+    window.__dbg3d.calls++;
+    if (!api.enabled || !api.available) { window.__dbg3d.ret='nao disponivel'; return false; }
     const heroKey = e.heroKey;
-    if (!HERO_3D_MODELS[heroKey]) return false;
+    if (!HERO_3D_MODELS[heroKey]) { window.__dbg3d.ret='sem modelo p/ '+heroKey; return false; }
     if (!api.loadState[heroKey]) loadModel(heroKey);
     const model = api.models[heroKey];
-    if (!model || api.loadState[heroKey] !== 'ready') return false;
+    if (!model || api.loadState[heroKey] !== 'ready') { window.__dbg3d.ret='loadState='+api.loadState[heroKey]; return false; }
     try {
       const dt = Math.min(clock.getDelta(), 0.05);
       const state = getState ? getState(e) : 'idle';
@@ -10890,8 +10892,11 @@ const RUNECAST_3D = (function () {
       // desenha um retângulo sombreado em volta da área toda (bug visual no
       // Safari). O modelo 3D já tem profundidade/luz próprias.
       ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * 0.92, drawW, drawH);
+      window.__dbg3d.ok++;
+      window.__dbg3d.ret = 'render OK estado='+state;
       return true;
     } catch (err) {
+      window.__dbg3d.err = String(err).slice(0,80);
       console.warn('[3d] draw falhou, desativando 3D:', err);
       api.available = false;
       return false;
@@ -13637,6 +13642,22 @@ window.addEventListener('load', () => {
       console.log('[3d] Three.js não disponível — jogo seguindo em 2D');
     }
   }, 200);
+});
+
+// v3.114: overlay de debug 3D (temporário) — mostra na tela o que o módulo
+// 3D está fazendo. Toque nele para esconder.
+window.addEventListener('load', () => {
+  const dbg = document.createElement('div');
+  dbg.style.cssText = 'position:fixed;top:env(safe-area-inset-top,4px);left:4px;z-index:99999;background:rgba(0,0,0,.8);color:#0f0;font:11px monospace;padding:6px 8px;border-radius:6px;max-width:80vw;line-height:1.4;pointer-events:auto';
+  dbg.onclick = () => dbg.style.display = 'none';
+  document.body.appendChild(dbg);
+  setInterval(() => {
+    const d = window.__dbg3d || {calls:0, ok:0, ret:'(nunca chamado)', err:''};
+    const av = (typeof RUNECAST_3D!=='undefined') ? RUNECAST_3D.state.available : '?';
+    const ls = (typeof RUNECAST_3D!=='undefined') ? JSON.stringify(RUNECAST_3D.state.loadState) : '?';
+    dbg.innerHTML = 'THREE:'+(!!window.THREE)+' avail:'+av+'<br>load:'+ls+
+      '<br>calls:'+d.calls+' ok:'+d.ok+'<br>ret:'+d.ret+(d.err?'<br>ERR:'+d.err:'');
+  }, 400);
 });
 </script>
 </body>
