@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.118 — animacao sempre ativa</title>
+<title>Runecast v3.119 — diagnostico retangulo</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10930,9 +10930,14 @@ const RUNECAST_3D = (function () {
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
-      // v3.111: SEM shadowBlur aqui — aplicar sombra a um drawImage de canvas
-      // desenha um retângulo sombreado em volta da área toda (bug visual no
-      // Safari). O modelo 3D já tem profundidade/luz próprias.
+      // v3.119 TESTE DIAGNÓSTICO: desenha um retângulo vermelho semi-transparente
+      // na posição do mago ANTES da imagem 3D. Se o vermelho aparecer mas o mago
+      // não, o problema é o conteúdo do canvas WebGL. Se nem o vermelho aparecer,
+      // o problema é a posição/fxCtx/cobertura.
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,0,0,0.6)';
+      ctx.fillRect(charX - drawW/2, charY - drawH * 0.92, drawW, drawH);
+      ctx.restore();
       ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * 0.92, drawW, drawH);
       window.__dbg3d.ok++;
       window.__dbg3d.ret = 'render OK estado='+state;
