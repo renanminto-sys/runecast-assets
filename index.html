@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.117 — delta por modelo (fix animacao)</title>
+<title>Runecast v3.118 — animacao sempre ativa</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10789,13 +10789,18 @@ const RUNECAST_3D = (function () {
                     'maxDim=', maxDim.toFixed(2));
 
         let mixer = null; const actions = {};
+        let firstAction = null;
         if (gltf.animations && gltf.animations.length) {
           mixer = new THREE.AnimationMixer(root);
           gltf.animations.forEach(clip => { actions[clip.name] = clip; });
+          // v3.118: toca a 1ª animação JÁ na carga, garantindo que o
+          // SkinnedMesh nunca fique numa pose degenerada (que o fazia sumir).
+          firstAction = mixer.clipAction(gltf.animations[0]);
+          firstAction.play();
         }
         api.models[heroKey] = {
           root, mixer, actions, animations: gltf.animations || [],
-          currentAction: null, currentState: null,
+          currentAction: firstAction, currentState: null,
           // v3.115: posição-base para travar contra "root motion" (animações
           // que deslocam o personagem fazendo ele sair do quadro)
           basePos: { x: root.position.x, y: root.position.y, z: root.position.z }
@@ -10822,23 +10827,26 @@ const RUNECAST_3D = (function () {
 
   function setState(model, state) {
     if (!model.mixer) return;
-    if (model.currentState === state) return;
-    model.currentState = state;
     const clipName = resolveClip(model, state);
     if (!clipName) return;
-    const action = model.mixer.clipAction(model.actions[clipName]);
+    const sameState = (model.currentState === state);
+    model.currentState = state;
 
-    // v3.116: se o novo clip é o MESMO da ação atual (vários estados mapeiam
-    // para 'Walking'), não faz cross-fade contra si mesmo (isso zerava o peso
-    // e fazia o mago sumir). Só ajusta velocidade e mantém tocando.
-    if (model.currentAction && model.currentAction.getClip() === action.getClip()) {
-      action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
+    const action = model.mixer.clipAction(model.actions[clipName]);
+    const sameClip = model.currentAction && model.currentAction.getClip() === action.getClip();
+
+    // ajusta velocidade conforme o estado (idle = mais lento)
+    action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
+
+    // se já é o mesmo clip tocando, só garante que continua ativo e sai
+    if (sameClip) {
+      if (!action.isRunning()) action.play();
+      action.enabled = true;
+      action.setEffectiveWeight(1);
       return;
     }
 
-    action.reset();
-    action.enabled = true;
-    action.setEffectiveWeight(1);
+    // clip novo: configura loop e toca
     if (ONCE_STATES[state]) {
       action.setLoop(THREE.LoopOnce, 1);
       action.clampWhenFinished = true;
@@ -10846,11 +10854,13 @@ const RUNECAST_3D = (function () {
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.clampWhenFinished = false;
     }
-    action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
+    action.reset();
+    action.enabled = true;
+    action.setEffectiveWeight(1);
     action.play();
     if (model.currentAction && model.currentAction !== action) {
-      // cross-fade suave da ação anterior para a nova
-      action.crossFadeFrom(model.currentAction, 0.2, false);
+      model.currentAction.crossFadeTo ? action.crossFadeFrom(model.currentAction, 0.2, false)
+                                      : model.currentAction.stop();
     }
     model.currentAction = action;
   }
