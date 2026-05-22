@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.146 — Hips + skeleton.update</title>
+<title>Runecast v3.147 — TESTE 90 graus fixo</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10948,15 +10948,16 @@ const RUNECAST_3D = (function () {
       while (ddiff < -Math.PI) ddiff += Math.PI * 2;
       model._dirAng += ddiff * 0.2;
       if (model.hipsBone) {
-        // v3.146: premultiply no eixo Y do mundo — comprovado (teste Three.js)
-        // que vira a frente de +Z para -Z (costas) mantendo o personagem em pé.
+        // v3.147 TESTE: força 90° FIXO (perfil). Se o mago aparecer DE LADO,
+        // girar o osso funciona e o problema das costas é que frente/trás são
+        // visualmente parecidas. Se continuar de frente, o osso não afeta render.
         const qWorld = new THREE.Quaternion().setFromAxisAngle(
-          new THREE.Vector3(0, 1, 0), model._dirAng);
+          new THREE.Vector3(0, 1, 0), Math.PI / 2);
         model.hipsBone.quaternion.premultiply(qWorld);
         model.hipsBone.updateMatrixWorld(true);
         if (model.skinnedMesh && model.skinnedMesh.skeleton) model.skinnedMesh.skeleton.update();
       }
-      window.__dbg3d.faseLabel = 'hips dir='+model._dirAng.toFixed(2)+' st='+state;
+      window.__dbg3d.faseLabel = 'TESTE 90graus fixo st='+state;
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
