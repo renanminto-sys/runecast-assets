@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.163 — sliders no rodape</title>
+<title>Runecast v3.164 — so eixo Y (X,Z zerados)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10952,7 +10952,10 @@ const RUNECAST_3D = (function () {
         model._facingAngle = Math.atan2(vx, vy);
       }
       if (model.inner && model._facingAngle !== undefined) {
-        model.inner.rotation.y = model._facingAngle;
+        // v3.164: força X e Z ZERADOS — só o eixo Y (vertical) gira. Se algo
+        // estava inclinando o modelo (X/Z herdado ou acumulado), isso corrige e
+        // garante que ele só rode em pé, como um pião, nunca deitando.
+        model.inner.rotation.set(0, model._facingAngle, 0);
       }
       window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' ang='+(model._facingAngle||0).toFixed(2)+' vy='+vy.toFixed(0);
 
