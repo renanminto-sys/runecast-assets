@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.151 — facingAngle atan2 (como funcionava)</title>
+<title>Runecast v3.152 — rotacao direta (sem suavizar)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10942,13 +10942,10 @@ const RUNECAST_3D = (function () {
       if (sp > 0.3) {
         model._facingAngle = Math.atan2(-vx, -vy);
       }
-      const targetRotY = (model._facingAngle !== undefined) ? model._facingAngle : 0;
-      if (model.inner) {
-        // suaviza a rotação para virar de forma fluida
-        let diff = targetRotY - model.inner.rotation.y;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        model.inner.rotation.y += diff * 0.15;
+      if (model.inner && model._facingAngle !== undefined) {
+        // v3.152: atribuição DIRETA, como na versão que funcionava (sem
+        // suavização — ela estava acumulando voltas e quebrando a rotação).
+        model.inner.rotation.y = model._facingAngle;
       }
       window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' ang='+(model._facingAngle||0).toFixed(2);
 
