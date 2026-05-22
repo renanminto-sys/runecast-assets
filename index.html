@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.130 — debug direcao</title>
+<title>Runecast v3.131 — camera orbita (direcao)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10901,25 +10901,28 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.129: orientação baseada no ESTADO que o jogo já calcula (em vez de
-      // recalcular pelos vetores, que divergia na diagonal). Sincroniza com
-      // getEntitySpriteState: side/walking_back/walking/idle.
+      // v3.131: em vez de girar o MODELO (que não estava surtindo efeito
+      // visual — rotY chegava a 3.14 mas o mago seguia de frente), ORBITAMOS
+      // A CÂMERA ao redor do mago conforme a direção. Mover a câmera sempre
+      // muda o que se vê, independente de como o esqueleto foi montado.
       const vx = e.vx || 0;
-      let targetRotY;
+      let camAngle; // ângulo horizontal da câmera ao redor do mago (radianos)
       if (state === 'walking_back' || state === 'idle_back') {
-        targetRotY = Math.PI;                         // subindo -> de costas
+        camAngle = Math.PI;            // câmera vai para TRÁS -> vemos as costas
       } else if (state === 'side') {
-        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2; // lateral -> perfil
+        camAngle = (vx < 0) ? Math.PI/2 : -Math.PI/2; // câmera ao lado -> perfil
       } else if (state === 'walking') {
-        targetRotY = 0;                               // descendo -> de frente
+        camAngle = 0;                  // câmera na frente -> vemos a frente
       } else {
-        targetRotY = (e.facing < 0) ? -0.25 : 0.25;   // idle -> quase de frente
+        camAngle = (e.facing < 0) ? 0.3 : -0.3; // idle -> quase de frente
       }
-      // suaviza pelo caminho mais curto
-      let diff = targetRotY - model.root.rotation.y;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      model.root.rotation.y += diff * 0.2;
+      // suaviza o ângulo da câmera (caminho mais curto)
+      if (model._camAngle === undefined) model._camAngle = camAngle;
+      let ad = camAngle - model._camAngle;
+      while (ad > Math.PI) ad -= Math.PI * 2;
+      while (ad < -Math.PI) ad += Math.PI * 2;
+      model._camAngle += ad * 0.2;
+      model.root.rotation.y = 0; // modelo fixo; quem gira é a câmera
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10943,12 +10946,16 @@ const RUNECAST_3D = (function () {
         if (m && m.root) m.root.visible = (m === model);
       }
 
-      // v3.123: reaponta a câmera para o alvo deste modelo (cada modelo tem o
-      // seu, medido na carga). Garante que a câmera sempre enquadra o mago,
-      // mesmo com a cena/câmera compartilhada entre entidades.
+      // v3.131: posiciona a câmera ORBITANDO o modelo no ângulo calculado.
       if (model.camTarget) {
-        camera.position.set(model.camTarget.x, model.camTarget.y, model.camTarget.z + model.camDist);
-        camera.lookAt(model.camTarget.x, model.camTarget.y, model.camTarget.z);
+        const ang = model._camAngle || 0;
+        const t = model.camTarget, d = model.camDist;
+        camera.position.set(
+          t.x + Math.sin(ang) * d,
+          t.y,
+          t.z + Math.cos(ang) * d
+        );
+        camera.lookAt(t.x, t.y, t.z);
         camera.updateProjectionMatrix();
       }
 
