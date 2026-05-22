@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.142 — TESTE alterna A/B</title>
+<title>Runecast v3.143 — gira osso Hips (costas)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10827,9 +10827,17 @@ const RUNECAST_3D = (function () {
           firstAction = mixer.clipAction(gltf.animations[0]);
           firstAction.play();
         }
+        // v3.143: localiza o osso RAIZ do esqueleto (Hips). Girar o objeto não
+        // reorienta um SkinnedMesh (o skinning parte dos ossos), mas girar o
+        // osso raiz SIM. É a forma correta de virar o personagem de costas.
+        let hipsBone = null;
+        innerModel.traverse(o => {
+          if (o.isBone && /hips/i.test(o.name) && !hipsBone) hipsBone = o;
+        });
         api.models[heroKey] = {
           root, inner: innerModel, mixer, actions, animations: gltf.animations || [],
           currentAction: firstAction, currentState: null,
+          hipsBone: hipsBone,
           // v3.123: alvo e distância da câmera (medidos na posição real do modelo)
           camTarget: camTarget, camDist: camDist
         };
@@ -10918,18 +10926,33 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.142 TESTE: ignora o estado e ALTERNA a câmera entre +Z e -Z a cada
-      // 2 segundos. Você vai ver o mago alternar entre duas vistas. Me diga em
-      // qual das duas (A ou B) aparecem as COSTAS. Assim travamos o valor certo.
-      const fase = Math.floor(Date.now() / 2000) % 2;
-      const camAngleTarget = fase === 0 ? 0 : Math.PI;
-      window.__dbg3d.faseLabel = fase === 0 ? 'A (camAng=0, cam +Z)' : 'B (camAng=PI, cam -Z)';
-      if (model._camAng === undefined) model._camAng = camAngleTarget;
-      let cadiff = camAngleTarget - model._camAng;
-      while (cadiff > Math.PI) cadiff -= Math.PI * 2;
-      while (cadiff < -Math.PI) cadiff += Math.PI * 2;
-      model._camAng += cadiff * 0.2;
-      model.root.rotation.set(0, 0, 0); // modelo fixo; a câmera é que orbita
+      // v3.143: DIREÇÃO girando o OSSO RAIZ (Hips), aplicada DEPOIS do mixer.
+      // O mixer (animação) define a rotação do Hips a cada frame; nós
+      // adicionamos nossa rotação de direção por cima. Esta é a forma correta
+      // de reorientar um SkinnedMesh — girar o objeto não funciona.
+      const vx = e.vx || 0;
+      let dirAngle;
+      if (state === 'walking_back' || state === 'idle_back') {
+        dirAngle = Math.PI;                              // subir -> costas
+      } else if (state === 'side') {
+        dirAngle = (vx < 0) ? -Math.PI/2 : Math.PI/2;    // perfil
+      } else if (state === 'walking') {
+        dirAngle = 0;                                    // descer -> frente
+      } else {
+        dirAngle = (e.facing < 0) ? -0.25 : 0.25;        // idle quase frente
+      }
+      if (model._dirAng === undefined) model._dirAng = dirAngle;
+      let ddiff = dirAngle - model._dirAng;
+      while (ddiff > Math.PI) ddiff -= Math.PI * 2;
+      while (ddiff < -Math.PI) ddiff += Math.PI * 2;
+      model._dirAng += ddiff * 0.2;
+      if (model.hipsBone) {
+        // adiciona nossa rotação de direção sobre a rotação que a animação
+        // acabou de definir no Hips (eixo Y do osso = vertical do personagem)
+        model.hipsBone.rotation.y += model._dirAng;
+        model.hipsBone.updateMatrixWorld(true);
+      }
+      window.__dbg3d.faseLabel = 'hips dir='+model._dirAng.toFixed(2)+' st='+state;
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10953,14 +10976,11 @@ const RUNECAST_3D = (function () {
         if (m && m.root) m.root.visible = (m === model);
       }
 
-      // v3.140: câmera ORBITA o modelo. Para walking_back, eleva a câmera e
-      // posiciona atrás, garantindo vista de costas (de cima), estilo
-      // plataforma 3D. up fixo para não "rolar".
+      // v3.143: câmera FIXA na frente (+Z). Quem vira o personagem é o osso Hips.
       if (model.camTarget) {
         const t = model.camTarget, d = model.camDist;
-        const a = model._camAng || 0;
         camera.up.set(0, 1, 0);
-        camera.position.set(t.x + Math.sin(a) * d, t.y, t.z + Math.cos(a) * d);
+        camera.position.set(t.x, t.y, t.z + d);
         camera.lookAt(t.x, t.y, t.z);
         camera.updateProjectionMatrix();
       }
@@ -10973,7 +10993,7 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = 'FASE '+(window.__dbg3d.faseLabel||'?')+' camZ='+camera.position.z.toFixed(1);
+      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?')+' hips='+(model.hipsBone?'sim':'NAO');
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
