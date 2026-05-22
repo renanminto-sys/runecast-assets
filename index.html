@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.127 — tamanho nativo (sem normalizar)</title>
+<title>Runecast v3.128 — ajustes finos (sombra/barra/direcao)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10901,10 +10901,29 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // orientação por facing (ângulo leve = mais de frente)
-      const facing = e.facing || 1;
-      const targetRotY = facing < 0 ? -0.25 : 0.25;
-      model.root.rotation.y += (targetRotY - model.root.rotation.y) * 0.15;
+      // v3.128: orientação conforme a DIREÇÃO REAL do movimento.
+      // - parado (idle): de frente (leve ângulo).
+      // - andando para os lados: vira de perfil (esquerda/direita).
+      // - andando para cima (afastando): de costas.
+      // - andando para baixo (aproximando): de frente.
+      const vx = e.vx || 0, vy = e.vy || 0;
+      const moving = Math.sqrt(vx*vx + vy*vy) > 5;
+      let targetRotY;
+      if (!moving) {
+        targetRotY = (e.facing < 0) ? -0.25 : 0.25; // parado, quase de frente
+      } else if (Math.abs(vx) > Math.abs(vy)) {
+        // movimento predominantemente lateral -> perfil
+        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;
+      } else if (vy < 0) {
+        targetRotY = Math.PI; // subindo (afastando) -> de costas
+      } else {
+        targetRotY = 0; // descendo (aproximando) -> de frente
+      }
+      // suaviza a rotação (caminho mais curto no círculo)
+      let diff = targetRotY - model.root.rotation.y;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      model.root.rotation.y += diff * 0.2;
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10948,7 +10967,11 @@ const RUNECAST_3D = (function () {
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
-      ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * 0.92, drawW, drawH);
+      // v3.128: FOOT_OFFSET alinha os pés do mago com a sombra/chão. O canvas
+      // 3D tem espaço vazio abaixo dos pés; este fator desce o desenho para a
+      // sombra ficar nos pés (não "voando"). Aumentar = mago mais pra baixo.
+      const FOOT_OFFSET = 0.62;
+      ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * FOOT_OFFSET, drawW, drawH);
       window.__dbg3d.ok++;
       window.__dbg3d.ret = 'render OK estado='+state;
       return true;
@@ -11945,7 +11968,7 @@ function drawEntityBars(e, charX, charY) {
   if (typeof RUNECAST_3D !== 'undefined' && RUNECAST_3D.config &&
       RUNECAST_3D.config.HERO_3D_MODELS[e.heroKey] &&
       RUNECAST_3D.state.available) {
-    extraUp = 95; // sobe a barra ~altura do mago 3D
+    extraUp = 45; // sobe a barra para acima da cabeça do mago 3D
   }
   const offsetY = -(PLAYER_RADIUS + 18 + extraUp);
   const barX = charX - barW / 2;
