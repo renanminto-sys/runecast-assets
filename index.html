@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.148 — direcao por osso (final)</title>
+<title>Runecast v3.150 — gira gltf.scene (como funcionava)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10927,39 +10927,24 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.143: DIREÇÃO girando o OSSO RAIZ (Hips), aplicada DEPOIS do mixer.
-      // O mixer (animação) define a rotação do Hips a cada frame; nós
-      // adicionamos nossa rotação de direção por cima. Esta é a forma correta
-      // de reorientar um SkinnedMesh — girar o objeto não funciona.
-      const vx = e.vx || 0;
-      let dirAngle;
-      if (state === 'walking_back' || state === 'idle_back') {
-        // três-quartos de costas: a 180° puro este modelo fica ambíguo (cabelo/
-        // barba volumosos), mas a ~150° vê-se claramente o ombro e as costas.
-        dirAngle = (vx < 0) ? -2.6 : 2.6;                // subir -> costas 3/4
+      // v3.150: VOLTA à abordagem que FUNCIONAVA no chat anterior — girar o
+      // gltf.scene (model.inner) DIRETAMENTE no eixo Y. O bug foi eu ter
+      // embrulhado o modelo num Group extra (v3.133); girar o Group não afeta
+      // o SkinnedMesh, mas girar o gltf.scene (que contém o Armature) SIM.
+      const facing = e.facing || 1;
+      const goingBack = state === 'walking_back' || state === 'idle_back';
+      let targetRotY;
+      if (goingBack) {
+        targetRotY = Math.PI;                            // subir -> costas
       } else if (state === 'side') {
-        dirAngle = (vx < 0) ? -Math.PI/2 : Math.PI/2;    // perfil
-      } else if (state === 'walking') {
-        dirAngle = (vx < 0) ? -0.5 : 0.5;                // descer -> frente 3/4
+        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;  // perfil
       } else {
-        dirAngle = (e.facing < 0) ? -0.3 : 0.3;          // idle quase frente
+        targetRotY = (facing < 0) ? -0.4 : 0.4;          // frente 3/4
       }
-      if (model._dirAng === undefined) model._dirAng = dirAngle;
-      let ddiff = dirAngle - model._dirAng;
-      while (ddiff > Math.PI) ddiff -= Math.PI * 2;
-      while (ddiff < -Math.PI) ddiff += Math.PI * 2;
-      model._dirAng += ddiff * 0.2;
-      if (model.hipsBone) {
-        // v3.148 FINAL: girar o osso Hips funciona (confirmado: a 90° o mago
-        // vira de perfil). Aplicamos o ângulo de direção suavizado. Eixo Y do
-        // mundo via premultiply, depois recalcula o esqueleto para o render.
-        const qWorld = new THREE.Quaternion().setFromAxisAngle(
-          new THREE.Vector3(0, 1, 0), model._dirAng);
-        model.hipsBone.quaternion.premultiply(qWorld);
-        model.hipsBone.updateMatrixWorld(true);
-        if (model.skinnedMesh && model.skinnedMesh.skeleton) model.skinnedMesh.skeleton.update();
+      if (model.inner) {
+        model.inner.rotation.y += (targetRotY - model.inner.rotation.y) * 0.15;
       }
-      window.__dbg3d.faseLabel = 'dir='+model._dirAng.toFixed(2)+' st='+state;
+      window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' st='+state;
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -11000,7 +10985,7 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?')+' hips='+(model.hipsBone?'sim':'NAO');
+      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?');
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
