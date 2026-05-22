@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.128 — ajustes finos (sombra/barra/direcao)</title>
+<title>Runecast v3.129 — direcao de costas</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10901,25 +10901,21 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.128: orientação conforme a DIREÇÃO REAL do movimento.
-      // - parado (idle): de frente (leve ângulo).
-      // - andando para os lados: vira de perfil (esquerda/direita).
-      // - andando para cima (afastando): de costas.
-      // - andando para baixo (aproximando): de frente.
-      const vx = e.vx || 0, vy = e.vy || 0;
-      const moving = Math.sqrt(vx*vx + vy*vy) > 5;
+      // v3.129: orientação baseada no ESTADO que o jogo já calcula (em vez de
+      // recalcular pelos vetores, que divergia na diagonal). Sincroniza com
+      // getEntitySpriteState: side/walking_back/walking/idle.
+      const vx = e.vx || 0;
       let targetRotY;
-      if (!moving) {
-        targetRotY = (e.facing < 0) ? -0.25 : 0.25; // parado, quase de frente
-      } else if (Math.abs(vx) > Math.abs(vy)) {
-        // movimento predominantemente lateral -> perfil
-        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;
-      } else if (vy < 0) {
-        targetRotY = Math.PI; // subindo (afastando) -> de costas
+      if (state === 'walking_back' || state === 'idle_back') {
+        targetRotY = Math.PI;                         // subindo -> de costas
+      } else if (state === 'side') {
+        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2; // lateral -> perfil
+      } else if (state === 'walking') {
+        targetRotY = 0;                               // descendo -> de frente
       } else {
-        targetRotY = 0; // descendo (aproximando) -> de frente
+        targetRotY = (e.facing < 0) ? -0.25 : 0.25;   // idle -> quase de frente
       }
-      // suaviza a rotação (caminho mais curto no círculo)
+      // suaviza pelo caminho mais curto
       let diff = targetRotY - model.root.rotation.y;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
