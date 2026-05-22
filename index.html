@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.158 — camera 47 graus mira centro</title>
+<title>Runecast v3.159 — diag cabeca/pes</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10735,15 +10735,11 @@ const RUNECAST_3D = (function () {
       // v3.155: câmera ortográfica inclinada (estilo v3.113), ajustada ao nosso
       // modelo que tem pés em y=0 e altura ~2.56. Frustum enquadra a altura,
       // câmera elevada e à frente olhando para o meio do corpo.
-      const MH = 2.56;                 // altura do modelo (pés em y=0)
-      const MC = MH * 0.5;             // centro do modelo (y)
-      // v3.158: MESMO ângulo de 47° da v3.113, mas mirando o CENTRO do nosso
-      // modelo (altura 2.56, pés em y=0) e com zoom que enquadra o corpo todo.
-      const ORTHO = MH * 0.65;
+      const MH = 2.56;
+      const MC = MH * 0.5;
+      const ORTHO = MH * 0.7;
       const aspect = RENDER_W / RENDER_H;
-      camera = new THREE.OrthographicCamera(
-        -ORTHO * aspect, ORTHO * aspect, ORTHO, -ORTHO, 0.1, 1000);
-      // posição a 47° acima, mirando o centro do modelo
+      camera = new THREE.OrthographicCamera(-ORTHO*aspect, ORTHO*aspect, ORTHO, -ORTHO, 0.1, 1000);
       const camDistOrtho = 10;
       const ang47 = 47 * Math.PI / 180;
       camera.position.set(0, MC + camDistOrtho * Math.sin(ang47), camDistOrtho * Math.cos(ang47));
@@ -10992,13 +10988,28 @@ const RUNECAST_3D = (function () {
 
       renderer.render(scene, camera);
 
+      // v3.159 DIAGNÓSTICO: mede onde a CABEÇA e os PÉS do mago aparecem na
+      // tela (NDC y: +1 topo, -1 base). Se cabeça > pés = em pé; se ~iguais ou
+      // invertido = deitado. Roda no aparelho real para revelar o que acontece.
+      try {
+        const _head = model.inner.getObjectByName('Head') || model.inner.getObjectByName('head');
+        const _foot = model.inner.getObjectByName('LeftFoot') || model.inner.getObjectByName('RightFoot');
+        if (_head && _foot) {
+          const _hp = new THREE.Vector3(); _head.getWorldPosition(_hp); _hp.project(camera);
+          const _fp = new THREE.Vector3(); _foot.getWorldPosition(_fp); _fp.project(camera);
+          window.__dbg3d.headfoot = 'hY='+_hp.y.toFixed(2)+' fY='+_fp.y.toFixed(2)+(_hp.y > _fp.y+0.1 ? ' EMPE' : ' DEITADO');
+        } else {
+          window.__dbg3d.headfoot = 'ossos? h='+(!!_head)+' f='+(!!_foot);
+        }
+      } catch(_e) { window.__dbg3d.headfoot = 'erro:'+String(_e).slice(0,20); }
+
       // v3.120 diagnóstico: registra posições para o painel
       window.__dbg3d.cam = camera.position.x.toFixed(1)+','+camera.position.y.toFixed(1)+','+camera.position.z.toFixed(1);
       const wp = new THREE.Vector3(); model.root.getWorldPosition(wp);
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?');
+      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?')+' | '+(window.__dbg3d.headfoot||'?');
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
