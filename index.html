@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.139 — frente invertida (-Z)</title>
+<title>Runecast v3.141 — orientacao medida (costas)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10918,19 +10918,19 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.139: a FRENTE do modelo aponta para -Z (não +Z). Por isso estava
-      // invertido: câmera atrás mostrava o rosto. Trocamos os ângulos de
-      // walking_back (subir) e walking (descer) para corrigir.
+      // v3.141: orientação medida via ossos — a frente do mago aponta para +Z
+      // no Three.js. Então: para ver as COSTAS, câmera vai para -Z (camAng=PI);
+      // para ver a FRENTE, câmera em +Z (camAng=0).
       const vx = e.vx || 0;
       let camAngleTarget;
       if (state === 'walking_back' || state === 'idle_back') {
-        camAngleTarget = 0;                                // subir -> costas (cam na frente -Z)
+        camAngleTarget = Math.PI;                          // subir -> costas (cam em -Z)
       } else if (state === 'side') {
-        camAngleTarget = (vx < 0) ? Math.PI/2 : -Math.PI/2; // perfil
+        camAngleTarget = (vx < 0) ? -Math.PI/2 : Math.PI/2; // perfil
       } else if (state === 'walking') {
-        camAngleTarget = Math.PI;                          // descer -> frente
+        camAngleTarget = 0;                                // descer -> frente (cam em +Z)
       } else {
-        camAngleTarget = Math.PI + (e.facing < 0 ? 0.25 : -0.25); // idle quase frente
+        camAngleTarget = (e.facing < 0) ? -0.25 : 0.25;    // idle quase frente
       }
       if (model._camAng === undefined) model._camAng = camAngleTarget;
       let cadiff = camAngleTarget - model._camAng;
@@ -10961,10 +10961,13 @@ const RUNECAST_3D = (function () {
         if (m && m.root) m.root.visible = (m === model);
       }
 
-      // v3.138: câmera ORBITA o modelo no ângulo calculado por direção.
+      // v3.140: câmera ORBITA o modelo. Para walking_back, eleva a câmera e
+      // posiciona atrás, garantindo vista de costas (de cima), estilo
+      // plataforma 3D. up fixo para não "rolar".
       if (model.camTarget) {
         const t = model.camTarget, d = model.camDist;
         const a = model._camAng || 0;
+        camera.up.set(0, 1, 0);
         camera.position.set(t.x + Math.sin(a) * d, t.y, t.z + Math.cos(a) * d);
         camera.lookAt(t.x, t.y, t.z);
         camera.updateProjectionMatrix();
@@ -10978,7 +10981,7 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = 'st='+state+' camAng='+(model._camAng||0).toFixed(2)+' camZ='+camera.position.z.toFixed(1);
+      window.__dbg3d.ret = 'st='+state+' camAng='+(model._camAng||0).toFixed(2)+' innerRotX='+(model.inner?model.inner.rotation.x.toFixed(2):'?');
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
