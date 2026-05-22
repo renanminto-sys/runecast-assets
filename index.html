@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.161 — escala nativa + mira correta</title>
+<title>Runecast v3.162 — sliders de calibracao</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10788,7 +10788,7 @@ const RUNECAST_3D = (function () {
         // para a altura desejada em unidades de mundo.
         const root = new THREE.Group();
         const NATIVE_H = 2.56;            // altura nativa real (medida no Blender)
-        const WORLD_H = 2.2;              // altura desejada na cena (unidades)
+        const WORLD_H = (window.__calib3d && window.__calib3d.worldH) || 2.2;
         root.scale.setScalar(WORLD_H / NATIVE_H);
         root.add(innerModel);
         // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
@@ -11006,12 +11006,9 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
       window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?')+' | '+(window.__dbg3d.headfoot||'?');
 
-      const drawH = TARGET_H;
+      const drawH = (window.__calib3d && window.__calib3d.targetH) || TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
-      // v3.128: FOOT_OFFSET alinha os pés do mago com a sombra/chão. O canvas
-      // 3D tem espaço vazio abaixo dos pés; este fator desce o desenho para a
-      // sombra ficar nos pés (não "voando"). Aumentar = mago mais pra baixo.
-      const FOOT_OFFSET = 0.62;
+      const FOOT_OFFSET = (window.__calib3d && window.__calib3d.footOffset) || 0.62;
       ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * FOOT_OFFSET, drawW, drawH);
       window.__dbg3d.ok++;
       return true;
@@ -13772,22 +13769,48 @@ window.addEventListener('load', () => {
   }, 200);
 });
 
-// v3.114: overlay de debug 3D (temporário) — mostra na tela o que o módulo
-// 3D está fazendo. Toque nele para esconder.
+// v3.162: painel de CALIBRAÇÃO do mago 3D — sliders ao vivo. Ajuste e me passe
+// os valores. Toque em "ESCONDER" para ocultar.
 window.addEventListener('load', () => {
-  const dbg = document.createElement('div');
-  dbg.style.cssText = 'position:fixed;top:env(safe-area-inset-top,4px);left:4px;z-index:99999;background:rgba(0,0,0,.8);color:#0f0;font:11px monospace;padding:6px 8px;border-radius:6px;max-width:80vw;line-height:1.4;pointer-events:auto';
-  dbg.onclick = () => dbg.style.display = 'none';
-  document.body.appendChild(dbg);
-  setInterval(() => {
-    const d = window.__dbg3d || {calls:0, ok:0, ret:'(nunca chamado)', err:''};
-    const av = (typeof RUNECAST_3D!=='undefined') ? RUNECAST_3D.state.available : '?';
-    const ls = (typeof RUNECAST_3D!=='undefined') ? JSON.stringify(RUNECAST_3D.state.loadState) : '?';
-    dbg.innerHTML = 'THREE:'+(!!window.THREE)+' avail:'+av+'<br>load:'+ls+
-      '<br>calls:'+d.calls+' ok:'+d.ok+'<br>ret:'+d.ret+
-      '<br>cam:'+(d.cam||'?')+'<br>mdl:'+(d.mdl||'?')+' vis:'+(d.vis)+' sc:'+(d.sc||'?')+
-      (d.err?'<br>ERR:'+d.err:'');
-  }, 400);
+  window.__calib3d = window.__calib3d || { targetH: 130, footOffset: 0.62, worldH: 2.2 };
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'position:fixed;top:env(safe-area-inset-top,8px);left:4px;right:4px;z-index:99999;background:rgba(0,0,0,.82);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:8px;line-height:1.6;pointer-events:auto';
+
+  function makeSlider(label, key, min, max, step, val) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin:4px 0';
+    const lab = document.createElement('span');
+    lab.style.cssText = 'min-width:95px;color:#9f9';
+    const sld = document.createElement('input');
+    sld.type = 'range'; sld.min = min; sld.max = max; sld.step = step; sld.value = val;
+    sld.style.cssText = 'flex:1;touch-action:none';
+    const out = document.createElement('span');
+    out.style.cssText = 'min-width:48px;text-align:right;color:#fff';
+    const upd = () => {
+      lab.textContent = label;
+      out.textContent = parseFloat(sld.value).toFixed(2);
+      window.__calib3d[key] = parseFloat(sld.value);
+    };
+    sld.addEventListener('input', upd); upd();
+    row.appendChild(lab); row.appendChild(sld); row.appendChild(out);
+    return row;
+  }
+
+  const title = document.createElement('div');
+  title.textContent = 'CALIBRAR MAGO 3D';
+  title.style.cssText = 'color:#fff;font-weight:bold;margin-bottom:4px';
+  panel.appendChild(title);
+  panel.appendChild(makeSlider('Tamanho (px)', 'targetH', 60, 400, 5, window.__calib3d.targetH));
+  panel.appendChild(makeSlider('Altura/posição', 'footOffset', 0.2, 1.2, 0.02, window.__calib3d.footOffset));
+
+  const hint = document.createElement('div');
+  hint.style.cssText = 'color:#888;font-size:10px;margin-top:6px';
+  hint.textContent = 'Ajuste e me passe os 2 valores. Toque aqui para esconder.';
+  hint.onclick = () => panel.style.display = 'none';
+  panel.appendChild(hint);
+
+  document.body.appendChild(panel);
 });
 </script>
 </body>
