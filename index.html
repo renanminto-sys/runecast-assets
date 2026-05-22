@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.132 — debug camAng</title>
+<title>Runecast v3.133 — gira modelo via group</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10762,7 +10762,13 @@ const RUNECAST_3D = (function () {
     const loader = new THREE.GLTFLoader();
     loader.load(url, (gltf) => {
       try {
-        const root = gltf.scene;
+        const innerModel = gltf.scene;
+        // v3.133: envolve o modelo num GROUP. A rotação de direção é aplicada
+        // ao GROUP (pai), não ao gltf.scene — assim as animações (que podem
+        // animar a rotação do nó raiz interno) não sobrescrevem nossa rotação
+        // de "virar de costas/lado".
+        const root = new THREE.Group();
+        root.add(innerModel);
         // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
         // Hips e mexer nisso quebra). Em vez disso, mede ONDE o modelo está e
         // aponta a câmera para lá. Infalível: seja qual for a posição, a câmera
@@ -10803,7 +10809,7 @@ const RUNECAST_3D = (function () {
         let mixer = null; const actions = {};
         let firstAction = null;
         if (gltf.animations && gltf.animations.length) {
-          mixer = new THREE.AnimationMixer(root);
+          mixer = new THREE.AnimationMixer(innerModel);
           gltf.animations.forEach(clip => { actions[clip.name] = clip; });
           // v3.118: toca a 1ª animação JÁ na carga, garantindo que o
           // SkinnedMesh nunca fique numa pose degenerada (que o fazia sumir).
@@ -10901,28 +10907,26 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.131: em vez de girar o MODELO (que não estava surtindo efeito
-      // visual — rotY chegava a 3.14 mas o mago seguia de frente), ORBITAMOS
-      // A CÂMERA ao redor do mago conforme a direção. Mover a câmera sempre
-      // muda o que se vê, independente de como o esqueleto foi montado.
+      // v3.133: VOLTA a girar o MODELO (como na versão que funcionava — o
+      // usuário confirmou que com este modelo o mago ficava de costas).
+      // Orbitar a câmera (v3.131) foi um desvio errado.
       const vx = e.vx || 0;
-      let camAngle; // ângulo horizontal da câmera ao redor do mago (radianos)
+      let targetRotY;
       if (state === 'walking_back' || state === 'idle_back') {
-        camAngle = Math.PI;            // câmera vai para TRÁS -> vemos as costas
+        targetRotY = Math.PI;                            // subindo -> costas
       } else if (state === 'side') {
-        camAngle = (vx < 0) ? Math.PI/2 : -Math.PI/2; // câmera ao lado -> perfil
+        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;  // lateral -> perfil
       } else if (state === 'walking') {
-        camAngle = 0;                  // câmera na frente -> vemos a frente
+        targetRotY = 0;                                  // descendo -> frente
       } else {
-        camAngle = (e.facing < 0) ? 0.3 : -0.3; // idle -> quase de frente
+        targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
       }
-      // suaviza o ângulo da câmera (caminho mais curto)
-      if (model._camAngle === undefined) model._camAngle = camAngle;
-      let ad = camAngle - model._camAngle;
-      while (ad > Math.PI) ad -= Math.PI * 2;
-      while (ad < -Math.PI) ad += Math.PI * 2;
-      model._camAngle += ad * 0.2;
-      model.root.rotation.y = 0; // modelo fixo; quem gira é a câmera
+      if (model._rotY === undefined) model._rotY = targetRotY;
+      let diff = targetRotY - model._rotY;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      model._rotY += diff * 0.2;
+      model.root.rotation.y = model._rotY;
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10946,15 +10950,10 @@ const RUNECAST_3D = (function () {
         if (m && m.root) m.root.visible = (m === model);
       }
 
-      // v3.131: posiciona a câmera ORBITANDO o modelo no ângulo calculado.
+      // v3.133: câmera FIXA na frente do modelo. Quem gira é o modelo.
       if (model.camTarget) {
-        const ang = model._camAngle || 0;
         const t = model.camTarget, d = model.camDist;
-        camera.position.set(
-          t.x + Math.sin(ang) * d,
-          t.y,
-          t.z + Math.cos(ang) * d
-        );
+        camera.position.set(t.x, t.y, t.z + d);
         camera.lookAt(t.x, t.y, t.z);
         camera.updateProjectionMatrix();
       }
