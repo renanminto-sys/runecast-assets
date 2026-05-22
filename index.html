@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.162 — sliders de calibracao</title>
+<title>Runecast v3.163 — sliders no rodape</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -13775,7 +13775,11 @@ window.addEventListener('load', () => {
   window.__calib3d = window.__calib3d || { targetH: 130, footOffset: 0.62, worldH: 2.2 };
 
   const panel = document.createElement('div');
-  panel.style.cssText = 'position:fixed;top:env(safe-area-inset-top,8px);left:4px;right:4px;z-index:99999;background:rgba(0,0,0,.82);color:#0f0;font:12px monospace;padding:8px 10px;border-radius:8px;line-height:1.6;pointer-events:auto';
+  panel.style.cssText = 'position:fixed;bottom:env(safe-area-inset-bottom,8px);left:4px;right:4px;z-index:2147483647;background:rgba(0,0,0,.9);color:#0f0;font:12px monospace;padding:10px 12px;border-radius:10px;line-height:1.6;pointer-events:auto;border:1px solid #0f06';
+  // impede que toques no painel virem gestos de desenho na arena
+  ['touchstart','touchmove','touchend','pointerdown','pointermove','mousedown'].forEach(ev => {
+    panel.addEventListener(ev, e => e.stopPropagation(), { passive: false, capture: true });
+  });
 
   function makeSlider(label, key, min, max, step, val) {
     const row = document.createElement('div');
@@ -13784,7 +13788,10 @@ window.addEventListener('load', () => {
     lab.style.cssText = 'min-width:95px;color:#9f9';
     const sld = document.createElement('input');
     sld.type = 'range'; sld.min = min; sld.max = max; sld.step = step; sld.value = val;
-    sld.style.cssText = 'flex:1;touch-action:none';
+    sld.style.cssText = 'flex:1;touch-action:none;height:28px';
+    ['touchstart','touchmove','touchend','pointerdown','pointermove'].forEach(ev => {
+      sld.addEventListener(ev, e => e.stopPropagation(), { passive: true, capture: true });
+    });
     const out = document.createElement('span');
     out.style.cssText = 'min-width:48px;text-align:right;color:#fff';
     const upd = () => {
