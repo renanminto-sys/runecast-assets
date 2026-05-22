@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.137 — DoubleSide (costas)</title>
+<title>Runecast v3.138 — camera orbita (skinned fix)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10918,25 +10918,27 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.137: rotação por direção (agora funciona — o problema era backface
-      // culling, resolvido com DoubleSide). Eixo Y, baseado no estado do jogo.
+      // v3.138: a rotação do MODELO não afeta o SkinnedMesh (o skinning
+      // recalcula a malha a partir dos ossos, ignorando rotation do objeto).
+      // Por isso giramos a CÂMERA ao redor do mago — imune a isso e já provado
+      // que vira de lado. Calculamos o ângulo-alvo da órbita por direção.
       const vx = e.vx || 0;
-      let targetRotY;
+      let camAngleTarget;
       if (state === 'walking_back' || state === 'idle_back') {
-        targetRotY = Math.PI;                            // subindo -> costas
+        camAngleTarget = Math.PI;                          // costas
       } else if (state === 'side') {
-        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;  // lateral -> perfil
+        camAngleTarget = (vx < 0) ? -Math.PI/2 : Math.PI/2; // perfil
       } else if (state === 'walking') {
-        targetRotY = 0;                                  // descendo -> frente
+        camAngleTarget = 0;                                // frente
       } else {
-        targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
+        camAngleTarget = (e.facing < 0) ? -0.25 : 0.25;    // idle quase frente
       }
-      if (model._rotY === undefined) model._rotY = targetRotY;
-      let rdiff = targetRotY - model._rotY;
-      while (rdiff > Math.PI) rdiff -= Math.PI * 2;
-      while (rdiff < -Math.PI) rdiff += Math.PI * 2;
-      model._rotY += rdiff * 0.2;
-      model.root.rotation.set(0, model._rotY, 0);
+      if (model._camAng === undefined) model._camAng = camAngleTarget;
+      let cadiff = camAngleTarget - model._camAng;
+      while (cadiff > Math.PI) cadiff -= Math.PI * 2;
+      while (cadiff < -Math.PI) cadiff += Math.PI * 2;
+      model._camAng += cadiff * 0.2;
+      model.root.rotation.set(0, 0, 0); // modelo fixo; a câmera é que orbita
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10960,10 +10962,11 @@ const RUNECAST_3D = (function () {
         if (m && m.root) m.root.visible = (m === model);
       }
 
-      // v3.133: câmera FIXA na frente do modelo. Quem gira é o modelo.
+      // v3.138: câmera ORBITA o modelo no ângulo calculado por direção.
       if (model.camTarget) {
         const t = model.camTarget, d = model.camDist;
-        camera.position.set(t.x, t.y, t.z + d);
+        const a = model._camAng || 0;
+        camera.position.set(t.x + Math.sin(a) * d, t.y, t.z + Math.cos(a) * d);
         camera.lookAt(t.x, t.y, t.z);
         camera.updateProjectionMatrix();
       }
@@ -10976,6 +10979,7 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
+      window.__dbg3d.ret = 'st='+state+' camAng='+(model._camAng||0).toFixed(2)+' camZ='+camera.position.z.toFixed(1);
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
