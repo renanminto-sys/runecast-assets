@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.156 — camera mais frontal</title>
+<title>Runecast v3.158 — camera 47 graus mira centro</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10735,16 +10735,19 @@ const RUNECAST_3D = (function () {
       // v3.155: câmera ortográfica inclinada (estilo v3.113), ajustada ao nosso
       // modelo que tem pés em y=0 e altura ~2.56. Frustum enquadra a altura,
       // câmera elevada e à frente olhando para o meio do corpo.
-      const MH = 2.56;                 // altura do modelo
-      const ORTHO = MH * 0.62;         // meia-altura do frustum (enquadra o corpo)
+      const MH = 2.56;                 // altura do modelo (pés em y=0)
+      const MC = MH * 0.5;             // centro do modelo (y)
+      // v3.158: MESMO ângulo de 47° da v3.113, mas mirando o CENTRO do nosso
+      // modelo (altura 2.56, pés em y=0) e com zoom que enquadra o corpo todo.
+      const ORTHO = MH * 0.65;
       const aspect = RENDER_W / RENDER_H;
       camera = new THREE.OrthographicCamera(
         -ORTHO * aspect, ORTHO * aspect, ORTHO, -ORTHO, 0.1, 1000);
-      // v3.156: câmera MAIS FRONTAL e menos de cima. A vista muito picada
-      // (alta) fazia o mago parecer deitado ao virar de costas. Leve ângulo de
-      // cima (altura ~= distância*0.35) mostra as costas sem achatar.
-      camera.position.set(0, MH * 0.7, MH * 2.0);
-      camera.lookAt(0, MH * 0.5, 0);
+      // posição a 47° acima, mirando o centro do modelo
+      const camDistOrtho = 10;
+      const ang47 = 47 * Math.PI / 180;
+      camera.position.set(0, MC + camDistOrtho * Math.sin(ang47), camDistOrtho * Math.cos(ang47));
+      camera.lookAt(0, MC, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 0.85));
       const dir = new THREE.DirectionalLight(0xffffff, 1.1);
       dir.position.set(2, 5, 3); scene.add(dir);
