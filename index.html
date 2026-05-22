@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.134 — TESTE giro continuo</title>
+<title>Runecast v3.135 — TESTE giro inner</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10817,7 +10817,7 @@ const RUNECAST_3D = (function () {
           firstAction.play();
         }
         api.models[heroKey] = {
-          root, mixer, actions, animations: gltf.animations || [],
+          root, inner: innerModel, mixer, actions, animations: gltf.animations || [],
           currentAction: firstAction, currentState: null,
           // v3.123: alvo e distância da câmera (medidos na posição real do modelo)
           camTarget: camTarget, camDist: camDist
@@ -10921,12 +10921,12 @@ const RUNECAST_3D = (function () {
       } else {
         targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
       }
-      // v3.134 TESTE DIAGNÓSTICO: gira o modelo continuamente, ignorando o
-      // estado. Se o mago girar visivelmente (rodopiar), a rotação do Group
-      // funciona e o problema era a lógica de estado. Se NÃO girar, a rotação
-      // não afeta o render (problema estrutural).
-      model.root.rotation.y = (Date.now() / 600) % (Math.PI * 2);
-      window.__dbg3d.ret = 'TESTE giro rotY='+model.root.rotation.y.toFixed(2);
+      // v3.135 TESTE: gira tanto o group quanto o innerModel, e testa eixo Y.
+      // Também loga a estrutura para o painel.
+      const spin = (Date.now() / 600) % (Math.PI * 2);
+      model.root.rotation.y = spin;
+      if (model.inner) model.inner.rotation.y = spin;
+      window.__dbg3d.ret = 'TESTE2 spin='+spin.toFixed(2)+' hasInner='+(!!model.inner);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
