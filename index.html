@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.141 — orientacao medida (costas)</title>
+<title>Runecast v3.142 — TESTE alterna A/B</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10918,20 +10918,12 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.141: orientação medida via ossos — a frente do mago aponta para +Z
-      // no Three.js. Então: para ver as COSTAS, câmera vai para -Z (camAng=PI);
-      // para ver a FRENTE, câmera em +Z (camAng=0).
-      const vx = e.vx || 0;
-      let camAngleTarget;
-      if (state === 'walking_back' || state === 'idle_back') {
-        camAngleTarget = Math.PI;                          // subir -> costas (cam em -Z)
-      } else if (state === 'side') {
-        camAngleTarget = (vx < 0) ? -Math.PI/2 : Math.PI/2; // perfil
-      } else if (state === 'walking') {
-        camAngleTarget = 0;                                // descer -> frente (cam em +Z)
-      } else {
-        camAngleTarget = (e.facing < 0) ? -0.25 : 0.25;    // idle quase frente
-      }
+      // v3.142 TESTE: ignora o estado e ALTERNA a câmera entre +Z e -Z a cada
+      // 2 segundos. Você vai ver o mago alternar entre duas vistas. Me diga em
+      // qual das duas (A ou B) aparecem as COSTAS. Assim travamos o valor certo.
+      const fase = Math.floor(Date.now() / 2000) % 2;
+      const camAngleTarget = fase === 0 ? 0 : Math.PI;
+      window.__dbg3d.faseLabel = fase === 0 ? 'A (camAng=0, cam +Z)' : 'B (camAng=PI, cam -Z)';
       if (model._camAng === undefined) model._camAng = camAngleTarget;
       let cadiff = camAngleTarget - model._camAng;
       while (cadiff > Math.PI) cadiff -= Math.PI * 2;
@@ -10981,7 +10973,7 @@ const RUNECAST_3D = (function () {
       window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
       window.__dbg3d.vis = model.root.visible;
       window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = 'st='+state+' camAng='+(model._camAng||0).toFixed(2)+' innerRotX='+(model.inner?model.inner.rotation.x.toFixed(2):'?');
+      window.__dbg3d.ret = 'FASE '+(window.__dbg3d.faseLabel||'?')+' camZ='+camera.position.z.toFixed(1);
 
       const drawH = TARGET_H;
       const drawW = drawH * (RENDER_W / RENDER_H);
