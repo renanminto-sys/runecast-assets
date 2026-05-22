@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.155 — modelo centrado + ortho ajustada</title>
+<title>Runecast v3.156 — camera mais frontal</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10740,8 +10740,10 @@ const RUNECAST_3D = (function () {
       const aspect = RENDER_W / RENDER_H;
       camera = new THREE.OrthographicCamera(
         -ORTHO * aspect, ORTHO * aspect, ORTHO, -ORTHO, 0.1, 1000);
-      // proporção 11:9 da v3.113, escalada para a altura do nosso modelo
-      camera.position.set(0, MH * 1.7, MH * 1.4);
+      // v3.156: câmera MAIS FRONTAL e menos de cima. A vista muito picada
+      // (alta) fazia o mago parecer deitado ao virar de costas. Leve ângulo de
+      // cima (altura ~= distância*0.35) mostra as costas sem achatar.
+      camera.position.set(0, MH * 0.7, MH * 2.0);
       camera.lookAt(0, MH * 0.5, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 0.85));
       const dir = new THREE.DirectionalLight(0xffffff, 1.1);
