@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.136 — TESTE eixo X</title>
+<title>Runecast v3.137 — DoubleSide (costas)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10763,6 +10763,17 @@ const RUNECAST_3D = (function () {
     loader.load(url, (gltf) => {
       try {
         const innerModel = gltf.scene;
+        // v3.137 CAUSA RAIZ: o usuário notou que "as costas são transparentes,
+        // dá pra ver o interior". Isso é backface culling — o modelo do Meshy
+        // só renderiza um lado das faces. Quando vira de costas, vemos o
+        // interior oco (a frente por dentro). Forçar DoubleSide resolve: agora
+        // os dois lados de cada face são desenhados, então as costas aparecem.
+        innerModel.traverse(o => {
+          if ((o.isMesh || o.isSkinnedMesh) && o.material) {
+            const mats = Array.isArray(o.material) ? o.material : [o.material];
+            mats.forEach(m => { m.side = THREE.DoubleSide; m.needsUpdate = true; });
+          }
+        });
         // v3.133: envolve o modelo num GROUP. A rotação de direção é aplicada
         // ao GROUP (pai), não ao gltf.scene — assim as animações (que podem
         // animar a rotação do nó raiz interno) não sobrescrevem nossa rotação
@@ -10907,9 +10918,8 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.133: VOLTA a girar o MODELO (como na versão que funcionava — o
-      // usuário confirmou que com este modelo o mago ficava de costas).
-      // Orbitar a câmera (v3.131) foi um desvio errado.
+      // v3.137: rotação por direção (agora funciona — o problema era backface
+      // culling, resolvido com DoubleSide). Eixo Y, baseado no estado do jogo.
       const vx = e.vx || 0;
       let targetRotY;
       if (state === 'walking_back' || state === 'idle_back') {
@@ -10921,12 +10931,12 @@ const RUNECAST_3D = (function () {
       } else {
         targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
       }
-      // v3.136 TESTE: tomba o mago no eixo X (deve cair para frente/trás
-      // continuamente). Se ele TOMBAR, rotação funciona e o eixo Y é que não
-      // vira costas (modelo deitado). Se NEM tombar, rotação não afeta render.
-      const spin = (Date.now() / 800) % (Math.PI * 2);
-      model.root.rotation.set(spin, 0, 0);
-      window.__dbg3d.ret = 'TESTE_X spin='+spin.toFixed(2);
+      if (model._rotY === undefined) model._rotY = targetRotY;
+      let rdiff = targetRotY - model._rotY;
+      while (rdiff > Math.PI) rdiff -= Math.PI * 2;
+      while (rdiff < -Math.PI) rdiff += Math.PI * 2;
+      model._rotY += rdiff * 0.2;
+      model.root.rotation.set(0, model._rotY, 0);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
