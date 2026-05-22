@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.164 — so eixo Y (X,Z zerados)</title>
+<title>Runecast v3.165 — gira root (replica v3.113)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10781,14 +10781,17 @@ const RUNECAST_3D = (function () {
             mats.forEach(m => { m.side = THREE.DoubleSide; m.needsUpdate = true; });
           }
         });
-        // v3.161: NÃO usar setFromObject para normalizar — ele mede a bind pose
-        // minúscula (0.02, escala do Armature) e explode o normScale. O modelo
-        // renderiza no tamanho NATIVO (~2.56) ignorando a escala do Armature.
-        // Então não normalizamos: deixamos no tamanho nativo e escalamos o root
-        // para a altura desejada em unidades de mundo.
+        // v3.165: REPLICA FIEL da v3.113. O segredo: o modelo é CENTRADO dentro
+        // de um pivot (root), e a rotação vai no ROOT, não no inner. Como não
+        // podemos medir (escala do Armature explode), usamos o offset NATIVO
+        // conhecido: centro do modelo em (0, 1.0, 0.28), pés em y~0.
         const root = new THREE.Group();
-        const NATIVE_H = 2.56;            // altura nativa real (medida no Blender)
+        const NATIVE_H = 2.56;
         const WORLD_H = (window.__calib3d && window.__calib3d.worldH) || 2.2;
+        // desloca o inner para que seu centro horizontal (X,Z) fique na origem
+        // do root — assim girar o root gira o mago em torno do próprio eixo.
+        innerModel.position.x = 0;
+        innerModel.position.z = -0.28;   // compensa o offset Z nativo do modelo
         root.scale.setScalar(WORLD_H / NATIVE_H);
         root.add(innerModel);
         // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
@@ -10951,11 +10954,11 @@ const RUNECAST_3D = (function () {
         // 0 (frente); direita (vx>0) -> +PI/2; esquerda -> -PI/2.
         model._facingAngle = Math.atan2(vx, vy);
       }
-      if (model.inner && model._facingAngle !== undefined) {
-        // v3.164: força X e Z ZERADOS — só o eixo Y (vertical) gira. Se algo
-        // estava inclinando o modelo (X/Z herdado ou acumulado), isso corrige e
-        // garante que ele só rode em pé, como um pião, nunca deitando.
-        model.inner.rotation.set(0, model._facingAngle, 0);
+      if (model.root && model._facingAngle !== undefined) {
+        // v3.165: gira o ROOT (pivot), exatamente como a v3.113. O inner está
+        // centrado dentro dele, então o mago gira em torno do próprio eixo
+        // vertical, em pé — sem deitar nem orbitar.
+        model.root.rotation.set(0, model._facingAngle, 0);
       }
       window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' ang='+(model._facingAngle||0).toFixed(2)+' vy='+vy.toFixed(0);
 
