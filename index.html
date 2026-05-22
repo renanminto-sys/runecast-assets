@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.131 — camera orbita (direcao)</title>
+<title>Runecast v3.132 — debug camAng</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10976,7 +10976,7 @@ const RUNECAST_3D = (function () {
       const FOOT_OFFSET = 0.62;
       ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * FOOT_OFFSET, drawW, drawH);
       window.__dbg3d.ok++;
-      window.__dbg3d.ret = 'estado='+state+' vy='+(e.vy||0).toFixed(0)+' rotY='+model.root.rotation.y.toFixed(2);
+      window.__dbg3d.ret = 'st='+state+' vy='+(e.vy||0).toFixed(0)+' camAng='+(model._camAngle||0).toFixed(2);
       return true;
     } catch (err) {
       window.__dbg3d.err = String(err).slice(0,80);
