@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.160 — arquitetura v3.113 (frustum mundo)</title>
+<title>Runecast v3.161 — escala nativa + mira correta</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10741,7 +10741,7 @@ const RUNECAST_3D = (function () {
       camera = new THREE.OrthographicCamera(
         -viewH * aspect / 2, viewH * aspect / 2, viewH / 2, -viewH / 2, 0.1, 1000);
       camera.position.set(0, 11, 9);   // inclinada estilo MOBA (v3.113)
-      camera.lookAt(0, 1.2, 0);
+      camera.lookAt(0, 0.43, 0);       // mira o centro real do mago (medido)
       scene.add(new THREE.AmbientLight(0xffffff, 1.4));
       const dir = new THREE.DirectionalLight(0xffffff, 1.6);
       dir.position.set(3, 10, 6); scene.add(dir);
@@ -10781,19 +10781,15 @@ const RUNECAST_3D = (function () {
             mats.forEach(m => { m.side = THREE.DoubleSide; m.needsUpdate = true; });
           }
         });
-        // v3.160: NORMALIZA para 1 unidade (como a v3.113). Modelo pequeno na
-        // cena de 8 unidades = aparece em pé/coerente. O root é escalado para a
-        // altura desejada em mundo (~2.2 un fica bom no frustum de 8).
+        // v3.161: NÃO usar setFromObject para normalizar — ele mede a bind pose
+        // minúscula (0.02, escala do Armature) e explode o normScale. O modelo
+        // renderiza no tamanho NATIVO (~2.56) ignorando a escala do Armature.
+        // Então não normalizamos: deixamos no tamanho nativo e escalamos o root
+        // para a altura desejada em unidades de mundo.
         const root = new THREE.Group();
-        const _box = new THREE.Box3().setFromObject(innerModel);
-        const _size = new THREE.Vector3(); _box.getSize(_size);
-        const _center = new THREE.Vector3(); _box.getCenter(_center);
-        const _normScale = 1.0 / (_size.y || 1);   // normaliza altura -> 1
-        innerModel.position.x = -_center.x * _normScale;
-        innerModel.position.z = -_center.z * _normScale;
-        innerModel.position.y = -_box.min.y * _normScale;  // pés em y=0
-        innerModel.scale.setScalar(_normScale);
-        root.scale.setScalar(2.2);   // altura final em unidades de mundo
+        const NATIVE_H = 2.56;            // altura nativa real (medida no Blender)
+        const WORLD_H = 2.2;              // altura desejada na cena (unidades)
+        root.scale.setScalar(WORLD_H / NATIVE_H);
         root.add(innerModel);
         // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
         // Hips e mexer nisso quebra). Em vez disso, mede ONDE o modelo está e
