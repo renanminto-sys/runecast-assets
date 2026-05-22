@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.154 — camera ortografica inclinada</title>
+<title>Runecast v3.155 — modelo centrado + ortho ajustada</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10732,15 +10732,17 @@ const RUNECAST_3D = (function () {
       renderer.setClearColor(0x000000, 0); // fundo 100% transparente
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       scene = new THREE.Scene();
-      // v3.154: câmera ORTOGRÁFICA ALTA e INCLINADA, como na v3.113 que mostrava
-      // as costas (estilo Brawl Stars/MOBA). A câmera reta de frente (antiga)
-      // deixava frente/costas ambíguas; vista de cima em ângulo mostra as costas.
-      const ORTHO = 1.6; // meia-altura do frustum ortográfico
+      // v3.155: câmera ortográfica inclinada (estilo v3.113), ajustada ao nosso
+      // modelo que tem pés em y=0 e altura ~2.56. Frustum enquadra a altura,
+      // câmera elevada e à frente olhando para o meio do corpo.
+      const MH = 2.56;                 // altura do modelo
+      const ORTHO = MH * 0.62;         // meia-altura do frustum (enquadra o corpo)
       const aspect = RENDER_W / RENDER_H;
       camera = new THREE.OrthographicCamera(
         -ORTHO * aspect, ORTHO * aspect, ORTHO, -ORTHO, 0.1, 1000);
-      camera.position.set(0, 11, 9);   // alta e inclinada
-      camera.lookAt(0, 1.2, 0);
+      // proporção 11:9 da v3.113, escalada para a altura do nosso modelo
+      camera.position.set(0, MH * 1.7, MH * 1.4);
+      camera.lookAt(0, MH * 0.5, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 0.85));
       const dir = new THREE.DirectionalLight(0xffffff, 1.1);
       dir.position.set(2, 5, 3); scene.add(dir);
@@ -10780,11 +10782,18 @@ const RUNECAST_3D = (function () {
             mats.forEach(m => { m.side = THREE.DoubleSide; m.needsUpdate = true; });
           }
         });
-        // v3.133: envolve o modelo num GROUP. A rotação de direção é aplicada
-        // ao GROUP (pai), não ao gltf.scene — assim as animações (que podem
-        // animar a rotação do nó raiz interno) não sobrescrevem nossa rotação
-        // de "virar de costas/lado".
+        // v3.155: REPLICA o spawnMage da v3.113 que funcionava — normaliza o
+        // modelo para altura ~2.5 e centra nos pés DENTRO do innerModel, depois
+        // envolve num root. A rotação vai no innerModel (gira em pé, testado).
         const root = new THREE.Group();
+        // mede o modelo para centrar
+        const _box = new THREE.Box3().setFromObject(innerModel);
+        const _size = new THREE.Vector3(); _box.getSize(_size);
+        const _center = new THREE.Vector3(); _box.getCenter(_center);
+        // centra X/Z na origem e põe os pés em y=0 (como a v3.113)
+        innerModel.position.x = -_center.x;
+        innerModel.position.z = -_center.z;
+        innerModel.position.y = -_box.min.y;
         root.add(innerModel);
         // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
         // Hips e mexer nisso quebra). Em vez disso, mede ONDE o modelo está e
