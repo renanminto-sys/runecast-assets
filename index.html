@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.133 — gira modelo via group</title>
+<title>Runecast v3.134 — TESTE giro continuo</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10921,12 +10921,12 @@ const RUNECAST_3D = (function () {
       } else {
         targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
       }
-      if (model._rotY === undefined) model._rotY = targetRotY;
-      let diff = targetRotY - model._rotY;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      model._rotY += diff * 0.2;
-      model.root.rotation.y = model._rotY;
+      // v3.134 TESTE DIAGNÓSTICO: gira o modelo continuamente, ignorando o
+      // estado. Se o mago girar visivelmente (rodopiar), a rotação do Group
+      // funciona e o problema era a lógica de estado. Se NÃO girar, a rotação
+      // não afeta o render (problema estrutural).
+      model.root.rotation.y = (Date.now() / 600) % (Math.PI * 2);
+      window.__dbg3d.ret = 'TESTE giro rotY='+model.root.rotation.y.toFixed(2);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
