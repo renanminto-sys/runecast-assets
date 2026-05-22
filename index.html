@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.135 — TESTE giro inner</title>
+<title>Runecast v3.136 — TESTE eixo X</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10921,12 +10921,12 @@ const RUNECAST_3D = (function () {
       } else {
         targetRotY = (e.facing < 0) ? -0.25 : 0.25;      // idle -> quase frente
       }
-      // v3.135 TESTE: gira tanto o group quanto o innerModel, e testa eixo Y.
-      // Também loga a estrutura para o painel.
-      const spin = (Date.now() / 600) % (Math.PI * 2);
-      model.root.rotation.y = spin;
-      if (model.inner) model.inner.rotation.y = spin;
-      window.__dbg3d.ret = 'TESTE2 spin='+spin.toFixed(2)+' hasInner='+(!!model.inner);
+      // v3.136 TESTE: tomba o mago no eixo X (deve cair para frente/trás
+      // continuamente). Se ele TOMBAR, rotação funciona e o eixo Y é que não
+      // vira costas (modelo deitado). Se NEM tombar, rotação não afeta render.
+      const spin = (Date.now() / 800) % (Math.PI * 2);
+      model.root.rotation.set(spin, 0, 0);
+      window.__dbg3d.ret = 'TESTE_X spin='+spin.toFixed(2);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -10975,7 +10975,6 @@ const RUNECAST_3D = (function () {
       const FOOT_OFFSET = 0.62;
       ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * FOOT_OFFSET, drawW, drawH);
       window.__dbg3d.ok++;
-      window.__dbg3d.ret = 'st='+state+' vy='+(e.vy||0).toFixed(0)+' camAng='+(model._camAngle||0).toFixed(2);
       return true;
     } catch (err) {
       window.__dbg3d.err = String(err).slice(0,80);
