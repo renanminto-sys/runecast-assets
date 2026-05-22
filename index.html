@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.144 — Hips eixo Y mundo</title>
+<title>Runecast v3.146 — Hips + skeleton.update</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10830,14 +10830,15 @@ const RUNECAST_3D = (function () {
         // v3.143: localiza o osso RAIZ do esqueleto (Hips). Girar o objeto não
         // reorienta um SkinnedMesh (o skinning parte dos ossos), mas girar o
         // osso raiz SIM. É a forma correta de virar o personagem de costas.
-        let hipsBone = null;
+        let hipsBone = null, skinnedMesh = null;
         innerModel.traverse(o => {
           if (o.isBone && /hips/i.test(o.name) && !hipsBone) hipsBone = o;
+          if (o.isSkinnedMesh && !skinnedMesh) skinnedMesh = o;
         });
         api.models[heroKey] = {
           root, inner: innerModel, mixer, actions, animations: gltf.animations || [],
           currentAction: firstAction, currentState: null,
-          hipsBone: hipsBone,
+          hipsBone: hipsBone, skinnedMesh: skinnedMesh,
           // v3.123: alvo e distância da câmera (medidos na posição real do modelo)
           camTarget: camTarget, camDist: camDist
         };
@@ -10947,14 +10948,13 @@ const RUNECAST_3D = (function () {
       while (ddiff < -Math.PI) ddiff += Math.PI * 2;
       model._dirAng += ddiff * 0.2;
       if (model.hipsBone) {
-        // v3.144: o eixo local do Hips é torto (a animação o deixa inclinado),
-        // então girar rotation.y local faz o personagem TOMBAR. A correção é
-        // girar em torno do eixo Y do MUNDO via quaternion, pré-multiplicando
-        // na quaternion que a animação acabou de definir.
+        // v3.146: premultiply no eixo Y do mundo — comprovado (teste Three.js)
+        // que vira a frente de +Z para -Z (costas) mantendo o personagem em pé.
         const qWorld = new THREE.Quaternion().setFromAxisAngle(
           new THREE.Vector3(0, 1, 0), model._dirAng);
         model.hipsBone.quaternion.premultiply(qWorld);
         model.hipsBone.updateMatrixWorld(true);
+        if (model.skinnedMesh && model.skinnedMesh.skeleton) model.skinnedMesh.skeleton.update();
       }
       window.__dbg3d.faseLabel = 'hips dir='+model._dirAng.toFixed(2)+' st='+state;
 
