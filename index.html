@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.138 — camera orbita (skinned fix)</title>
+<title>Runecast v3.139 — frente invertida (-Z)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10918,20 +10918,19 @@ const RUNECAST_3D = (function () {
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.138: a rotação do MODELO não afeta o SkinnedMesh (o skinning
-      // recalcula a malha a partir dos ossos, ignorando rotation do objeto).
-      // Por isso giramos a CÂMERA ao redor do mago — imune a isso e já provado
-      // que vira de lado. Calculamos o ângulo-alvo da órbita por direção.
+      // v3.139: a FRENTE do modelo aponta para -Z (não +Z). Por isso estava
+      // invertido: câmera atrás mostrava o rosto. Trocamos os ângulos de
+      // walking_back (subir) e walking (descer) para corrigir.
       const vx = e.vx || 0;
       let camAngleTarget;
       if (state === 'walking_back' || state === 'idle_back') {
-        camAngleTarget = Math.PI;                          // costas
+        camAngleTarget = 0;                                // subir -> costas (cam na frente -Z)
       } else if (state === 'side') {
-        camAngleTarget = (vx < 0) ? -Math.PI/2 : Math.PI/2; // perfil
+        camAngleTarget = (vx < 0) ? Math.PI/2 : -Math.PI/2; // perfil
       } else if (state === 'walking') {
-        camAngleTarget = 0;                                // frente
+        camAngleTarget = Math.PI;                          // descer -> frente
       } else {
-        camAngleTarget = (e.facing < 0) ? -0.25 : 0.25;    // idle quase frente
+        camAngleTarget = Math.PI + (e.facing < 0 ? 0.25 : -0.25); // idle quase frente
       }
       if (model._camAng === undefined) model._camAng = camAngleTarget;
       let cadiff = camAngleTarget - model._camAng;
