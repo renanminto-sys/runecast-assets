@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.126 — modelo certo + 7 animacoes</title>
+<title>Runecast v3.127 — tamanho nativo (sem normalizar)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10780,29 +10780,25 @@ const RUNECAST_3D = (function () {
           });
           return f ? b : null;
         }
-        // 1) normaliza altura para ~2 unidades (mantém proporção)
-        let m = measureReal(root);
-        let sz = new THREE.Vector3(); m.getSize(sz);
-        const s = 2.0 / (sz.y || 1);
-        root.scale.multiplyScalar(s);
-
-        // 2) mede a posição REAL (centro) já escalado e aponta a câmera pra lá
-        const fb = measureReal(root);
-        const fsize = new THREE.Vector3(); fb.getSize(fsize);
-        const fcenter = new THREE.Vector3(); fb.getCenter(fcenter);
-        const maxDim = Math.max(fsize.x, fsize.y);
+        // v3.127: NÃO normaliza a escala. Este modelo do Meshy tem escala 0.01
+        // no Armature, mas o skinning renderiza no tamanho NATIVO correto
+        // (~2.5 de altura, centrado na origem). Qualquer tentativa de medir e
+        // re-escalar cai na armadilha da escala do Armature e estoura o modelo
+        // (sc:117 = retângulo gigante). A solução é deixar como veio.
+        //
+        // Para enquadrar, usamos valores FIXOS conhecidos (medidos no Blender):
+        // altura ~2.5, centro na origem com leve offset Z.
+        const fcenter = new THREE.Vector3(0, 1.0, 0.28);
+        const knownHeight = 2.56;
+        const maxDim = knownHeight;
         const fov = camera.fov * (Math.PI / 180);
         const dist = (maxDim / 2) / Math.tan(fov / 2) * FRAME_MARGIN;
-        // câmera posicionada relativa ao CENTRO REAL do modelo (onde quer que esteja)
         camera.position.set(fcenter.x, fcenter.y, fcenter.z + dist);
         camera.lookAt(fcenter.x, fcenter.y, fcenter.z);
         camera.updateProjectionMatrix();
-        // guarda o centro para reapontar a câmera todo frame (a animação pode
-        // mover o centro pelo root motion)
         const camTarget = fcenter.clone();
         const camDist = dist;
-        console.log('[3d] enquadrado: centro=', fcenter.toArray().map(n=>n.toFixed(1)),
-                    'altura=', fsize.y.toFixed(2));
+        console.log('[3d] enquadrado (tamanho nativo): dist=', dist.toFixed(2));
 
         let mixer = null; const actions = {};
         let firstAction = null;
