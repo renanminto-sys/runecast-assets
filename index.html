@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.150 — gira gltf.scene (como funcionava)</title>
+<title>Runecast v3.151 — facingAngle atan2 (como funcionava)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10923,28 +10923,34 @@ const RUNECAST_3D = (function () {
       if (!model._lastT) model._lastT = tnow;
       const dt = Math.min((tnow - model._lastT) / 1000, 0.05);
       model._lastT = tnow;
-      const state = getState ? getState(e) : 'idle';
+      let state = getState ? getState(e) : 'idle';
+      // v3.151: como na versão que funcionava — walking_back e side usam a MESMA
+      // animação 'walking'; quem vira o personagem é a rotação (facingAngle).
+      if (state === 'walking_back' || state === 'side') state = 'walking';
+      if (state === 'idle_back') state = 'idle';
       setState(model, state);
       if (model.mixer) model.mixer.update(dt);
 
-      // v3.150: VOLTA à abordagem que FUNCIONAVA no chat anterior — girar o
-      // gltf.scene (model.inner) DIRETAMENTE no eixo Y. O bug foi eu ter
-      // embrulhado o modelo num Group extra (v3.133); girar o Group não afeta
-      // o SkinnedMesh, mas girar o gltf.scene (que contém o Armature) SIM.
-      const facing = e.facing || 1;
-      const goingBack = state === 'walking_back' || state === 'idle_back';
-      let targetRotY;
-      if (goingBack) {
-        targetRotY = Math.PI;                            // subir -> costas
-      } else if (state === 'side') {
-        targetRotY = (vx < 0) ? -Math.PI/2 : Math.PI/2;  // perfil
-      } else {
-        targetRotY = (facing < 0) ? -0.4 : 0.4;          // frente 3/4
+      // v3.151: REPLICA EXATA da versão que funcionava (chat anterior).
+      // A chave: NÃO usar estados fixos (walking_back/side) com ângulos
+      // chumbados, e SIM um ângulo CONTÍNUO calculado pela direção real do
+      // movimento: facingAngle = atan2(-vx, -vy). Aplicado direto no gltf.scene
+      // (model.inner). Cima=costas, baixo=frente, laterais corretas — natural.
+      const vx = e.vx || 0;
+      const vy = e.vy || 0;
+      const sp = Math.hypot(vx, vy);
+      if (sp > 0.3) {
+        model._facingAngle = Math.atan2(-vx, -vy);
       }
+      const targetRotY = (model._facingAngle !== undefined) ? model._facingAngle : 0;
       if (model.inner) {
-        model.inner.rotation.y += (targetRotY - model.inner.rotation.y) * 0.15;
+        // suaviza a rotação para virar de forma fluida
+        let diff = targetRotY - model.inner.rotation.y;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        model.inner.rotation.y += diff * 0.15;
       }
-      window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' st='+state;
+      window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' ang='+(model._facingAngle||0).toFixed(2);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
