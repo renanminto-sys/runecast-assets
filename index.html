@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.220 — idle Drax pose neutra</title>
+<title>Runecast v3.221 — sem debug + sombra 3D</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -11147,10 +11147,21 @@ function drawEntity(e) {
   const charY = ground.y - STAND_HEIGHT;
   
   // Sombra (elipse achatada no chão)
-  arenaCtx.fillStyle = 'rgba(0,0,0,0.45)';
-  arenaCtx.beginPath();
-  arenaCtx.ellipse(ground.x, ground.y + 2, PLAYER_RADIUS * 0.85, 7, 0, 0, Math.PI*2);
-  arenaCtx.fill();
+  // v3.221: para magos 3D, a sombra fica mais embaixo (alinhada aos pés 3D, que
+  // pela câmera inclinada aparecem mais baixo) e mais sutil — evita a sensação de
+  // "voando" com a sombra descolada, sobretudo quando o mago está de costas.
+  const is3DMage = (typeof mageHas3D === 'function') && mageHas3D(e);
+  if (is3DMage) {
+    arenaCtx.fillStyle = 'rgba(0,0,0,0.35)';
+    arenaCtx.beginPath();
+    arenaCtx.ellipse(ground.x, ground.y + 10, PLAYER_RADIUS * 0.7, 6, 0, 0, Math.PI*2);
+    arenaCtx.fill();
+  } else {
+    arenaCtx.fillStyle = 'rgba(0,0,0,0.45)';
+    arenaCtx.beginPath();
+    arenaCtx.ellipse(ground.x, ground.y + 2, PLAYER_RADIUS * 0.85, 7, 0, 0, Math.PI*2);
+    arenaCtx.fill();
+  }
   
   // v3.73: AURA DE CURA — partículas verdes subindo + símbolo + (+) brilhante
   if (e.healAuraTimer > 0) {
@@ -13882,20 +13893,7 @@ R3D.setEnabled = function(on) {
 window.Runecast3D = R3D;
 R3D.scaleMul = 0.54;   // v3.202: escala fixada (era 0.5)
 
-// v3.207: overlay de diagnóstico de animação (temporário) — mostra no aparelho
-// qual estado/animação está tocando para cada mago 3D.
-window.addEventListener('load', () => {
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;top:60px;left:6px;z-index:99999;background:rgba(0,0,0,0.75);color:#0ff;font:11px monospace;padding:6px 8px;border-radius:6px;max-width:90vw;pointer-events:none;white-space:pre-line';
-  document.body.appendChild(ov);
-  setInterval(() => {
-    const a = window.__anim3d || {};
-    const cs = window.__castSeen || {};
-    const now = Date.now();
-    const castP = cs.player ? ((now - cs.player) < 1500 ? 'CAST!' : 'há ' + Math.floor((now-cs.player)/1000) + 's') : 'nunca';
-    ov.textContent = 'ANIM 3D\n' + (a.player ? 'P ' + a.player : 'P -') + '\n' + (a.bot ? 'B ' + a.bot : 'B -') + '\ncast player: ' + castP;
-  }, 200);
-});
+// v3.221: overlay de diagnóstico de animação REMOVIDO (já não é necessário).
 
 // v3.110: slider de calibração de escala
 (function() {
