@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.223 — drax idle Dead frame 0</title>
+<title>Runecast v3.224 — drax idle Running 50%</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13826,12 +13826,12 @@ R3D.updateMage = function(id, gs) {
   const isDraxIdle = (m.heroKey === 'DRAX' && gs.state === 'idle');
 
   if (isDraxIdle) {
-    // v3.223: idle = FRAME 0 EXATO de "Dead". Renderizei todas as poses de
-    // frame 0: a do "Dead" no instante 0 é a mais ereta e natural (em pé, braços
-    // ao lado). O erro antes era usar "Dead" em 3% (já começava a cair) ou
-    // "Running" (stance de corrida). Frame 0 absoluto = pose de descanso.
+    // v3.224: idle = "Running" congelado a 50% do ciclo. Renderizei as candidatas
+    // de frente e costas; esta é a pose de descanso mais natural (stance firme de
+    // bárbaro, braços ao lado), boa nos dois ângulos. Frame de animação (não
+    // bind pose, que encolhe o modelo pela escala 0.01 do Armature e some).
     if (m.currentAnimName !== '__idleStatic') {
-      const poseClip = m.actions['Dead'] || m.actions['Running'] || Object.values(m.actions)[0];
+      const poseClip = m.actions['Running'] || m.actions['Walking'] || Object.values(m.actions)[0];
       for (const n in m.actions) {
         if (m.actions[n] !== poseClip) { m.actions[n].stop(); }
       }
@@ -13840,7 +13840,7 @@ R3D.updateMage = function(id, gs) {
         poseClip.enabled = true;
         poseClip.setEffectiveWeight(1.0);
         poseClip.play();
-        poseClip.time = 0;          // frame 0 exato (pose ereta, antes de cair)
+        poseClip.time = (poseClip.getClip().duration || 1) * 0.5;  // 50% do ciclo
         poseClip.timeScale = 0;     // congelado
         m.currentAction = poseClip;
       }
