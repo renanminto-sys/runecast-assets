@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.201 — direcoes + barra HP</title>
+<title>Runecast v3.202 — escala, sliders, arena, inicio de costas</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -4821,7 +4821,7 @@ const HOMING_STRENGTH = 0.06;
 const ARENA_PADDING = 8; // v3.9: arena maior, padding mínimo
 // v3.46: padding superior MAIOR — espaço pras barras HP/mana acima do mago + topo da cabeça,
 // pra mago não esbarrar visualmente na HUD superior
-const ARENA_PADDING_TOP = 40;
+const ARENA_PADDING_TOP = 90; // v3.202: aumentado p/ o mago 3D (mais alto) não passar atrás do HUD superior
 const HIT_TOLERANCE_RATIO = 0.06;
 const GUIDE_OPACITY = 0.22;
 const SPARK_DURATION = 700;
@@ -12294,6 +12294,10 @@ function startMatch(diff) {
   GAME.bot = createEntity(worldSize.w * 0.5, worldSize.h * 0.15, botHero.color, botHero.emoji, true, botHeroKey);
   GAME.player.heroKey = GAME.selectedHero;
   GAME.bot.heroKey = botHeroKey;
+  // v3.202: player começa de COSTAS (encarando o bot lá em cima) e o bot de
+  // frente (encarando o player). facingAngle: PI = costas, 0 = frente.
+  GAME.player._lastFacingAngle = Math.PI;
+  GAME.bot._lastFacingAngle = 0;
   // v3.108: ativa camada 3D e limpa magos antigos
   if (window.Runecast3D && window.Runecast3D.ready) {
     window.Runecast3D.clearMages();
@@ -13686,12 +13690,13 @@ R3D.setEnabled = function(on) {
   R3D.enabled = on;
   const canvas = document.getElementById('three-canvas');
   if (canvas) canvas.style.display = on ? 'block' : 'none';
+  // v3.202: painel de calibração REMOVIDO da tela (sempre oculto).
   const dbg = document.getElementById('scale3d-debug');
-  if (dbg) dbg.style.display = on ? 'flex' : 'none';
+  if (dbg) dbg.style.display = 'none';
 };
 
 window.Runecast3D = R3D;
-R3D.scaleMul = 0.5;
+R3D.scaleMul = 0.54;   // v3.202: escala fixada (era 0.5)
 
 // v3.110: slider de calibração de escala
 (function() {
