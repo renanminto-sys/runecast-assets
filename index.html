@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.168 — altura nativa 1.0 (corrigida)</title>
+<title>Runecast v3.170 — modelo aelar_3d.glb (da v3.113)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10679,7 +10679,7 @@ const RUNECAST_3D = (function () {
   // Mago de teste: AELAR usa o modelo otimizado hospedado no jsDelivr.
   // Os demais heróis não estão aqui -> continuam usando sprite 2D.
   const HERO_3D_MODELS = {
-    AELAR: 'mago_otimizado.glb'
+    AELAR: 'aelar_3d.glb'   // v3.170: modelo EXATO da v3.113 (3.2MB, texturas maiores)
   };
   // Plano B (se o jsDelivr falhar no seu device, troque pela linha abaixo):
   // Plano B (se quiser carregar de fora em vez de local, troque pela URL):
@@ -10740,8 +10740,11 @@ const RUNECAST_3D = (function () {
       // câmera ortográfica inclinada (v3.113). Frustum dimensionado em unidades
       // de mundo no resize(). Posição/ângulo idênticos à versão que funcionava.
       camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-      camera.position.set(0, 11, 9);
-      camera.lookAt(0, 1.0, 0);   // v3.168: mira o centro do mago (worldH 2.0 -> centro ~1.0)
+      // v3.169: câmera QUASE FRONTAL (leve ângulo de cima, ~12°). A câmera muito
+      // inclinada (47°) fazia o mago "andar na parede" porque a arena 2D é vista
+      // de frente, não de cima. Quase frontal casa com o plano da arena.
+      camera.position.set(0, 1.2, 5);
+      camera.lookAt(0, 1.0, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 1.4));
       const dir = new THREE.DirectionalLight(0xffffff, 1.6);
       dir.position.set(3, 10, 6); scene.add(dir);
@@ -11005,13 +11008,18 @@ const RUNECAST_3D = (function () {
       // o mago fica exatamente onde está no jogo, e a câmera inclinada o vê em
       // pé e coerente com a cena. NÃO copiamos imagem — o canvas já está sobre
       // a arena.
+      // v3.169: posiciona no PLANO VERTICAL da tela (z=0), não no chão
+      // horizontal. Como a arena 2D é vista de frente, o mago vive no mesmo
+      // plano dela. unproject num plano z=0 mapeia pixel -> posição no plano.
       const W = api._w || 1, H = api._h || 1;
       const ndcX = (charX / W) * 2 - 1;
       const ndcY = -((charY / H) * 2 - 1);
+      if (!api._planeZ0) api._planeZ0 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
       api._ray.setFromCamera({ x: ndcX, y: ndcY }, camera);
       const hit = new THREE.Vector3();
-      if (api._ray.ray.intersectPlane(api._planeY0, hit)) {
-        model.root.position.set(hit.x, 0, hit.z);
+      if (api._ray.ray.intersectPlane(api._planeZ0, hit)) {
+        // posiciona pelos pés: o modelo tem pés em ~y=0, então alinha hit.y aos pés
+        model.root.position.set(hit.x, hit.y, 0);
       }
       // v3.168: ALTURA NATIVA REAL = ~1.0 unidade (medida pelos ossos: cabeça
       // em y=1.06, pés em y=0.09). NÃO é 2.56 — eu vinha escalando errado por
