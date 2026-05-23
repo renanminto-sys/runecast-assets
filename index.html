@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.172 — diag rotacao do root</title>
+<title>Runecast v3.173 — diag ao vivo no painel</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -13866,6 +13866,15 @@ window.addEventListener('load', () => {
   hint.textContent = 'Ajuste e me passe os 2 valores. Toque aqui para esconder.';
   hint.onclick = () => panel.style.display = 'none';
   panel.appendChild(hint);
+
+  // v3.173: linha de diagnóstico AO VIVO — mostra os valores reais do 3D.
+  const diag = document.createElement('div');
+  diag.style.cssText = 'color:#0ff;font-size:11px;margin-top:6px;word-break:break-all';
+  panel.appendChild(diag);
+  setInterval(() => {
+    const d = window.__dbg3d || {};
+    diag.textContent = 'DIAG: ' + (d.ret || '(sem dados — 3D nao chamado)');
+  }, 300);
 
   document.body.appendChild(panel);
 });
