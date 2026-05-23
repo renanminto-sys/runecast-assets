@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.203 — arena topo + setup teste</title>
+<title>Runecast v3.206 — Drax 3D + selecao bloqueada</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -1402,6 +1402,10 @@
   .hero-card[data-hero="DRAX"]:active { box-shadow: 0 0 30px rgba(255, 111, 0, 0.7); }
   .hero-card[data-hero="KAEL"] { border-color: #ffd54f; }
   .hero-card[data-hero="KAEL"]:active { box-shadow: 0 0 30px rgba(255, 213, 79, 0.7); }
+  /* v3.206: cards bloqueados (só AELAR e DRAX disponíveis) */
+  .hero-card.locked { filter: grayscale(0.85) brightness(0.5); border-color: #555 !important; cursor: not-allowed; position: relative; opacity: 0.7; }
+  .hero-card.locked:active { transform: none; box-shadow: none !important; }
+  .hero-card.locked::after { content: "🔒 EM BREVE"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #ffd54f; font-size: 13px; font-weight: 700; letter-spacing: 1px; padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,213,79,0.5); white-space: nowrap; z-index: 5; }
   
   /* v3.67: Partículas no menu de heróis */
   .menu-particles {
@@ -3106,7 +3110,7 @@
           <div class="hero-ult">🌪️ Tempestade · AoE com slow</div>
         </div>
       </button>
-      <button class="hero-card" data-hero="MORWEN">
+      <button class="hero-card locked" data-hero="MORWEN" data-locked="true">
         <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <radialGradient id="orbMorwen"><stop offset="0%" stop-color="#f3e5f5"/><stop offset="60%" stop-color="#ce93d8"/><stop offset="100%" stop-color="#ce93d8" stop-opacity="0"/></radialGradient>
@@ -3152,7 +3156,7 @@
         </div>
       </button>
       <!-- v3.87: KAEL — Cronomante -->
-      <button class="hero-card" data-hero="KAEL">
+      <button class="hero-card locked" data-hero="KAEL" data-locked="true">
         <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <radialGradient id="orbKael"><stop offset="0%" stop-color="#fff8e1"/><stop offset="60%" stop-color="#ffd54f"/><stop offset="100%" stop-color="#ffd54f" stop-opacity="0"/></radialGradient>
@@ -4076,7 +4080,7 @@ const SPELL_UPGRADE_COSTS = [0, 100, 200, 400, 800]; // index = nível alvo
 function getHeroLevelMods(level) {
   const lvl = Math.max(1, Math.min(MAX_HERO_LEVEL, level));
   return {
-    hpBonus: (lvl - 1) * 5,           // +5 HP por nível
+    hpBonus: (lvl - 1) * 15,          // v3.205: +15 HP por nível
     manaMaxBonus: (lvl >= 10 ? 2 : (lvl >= 5 ? 1 : 0)),  // +1 mana max nível 5, +2 nível 10
     passiveMul: 1 + (lvl - 1) * 0.05,  // +5% por nível
     ultMul: 1 + (lvl - 1) * 0.05       // +5% por nível
@@ -4855,6 +4859,10 @@ const DIFFICULTY = {
   hard:   { botCastInterval: [1800, 2800], botPerfectChance: 0.35, botCastDuration: 1200, botSpeed: 160, dodgeStrength: 0.9 }
 };
 
+// v3.206: heróis liberados para seleção (jogador e bot). Fonte única da verdade.
+// Para liberar um novo mago, adicione a chave aqui (e remova o bloqueio do card).
+const UNLOCKED_HEROES = ['AELAR', 'DRAX'];
+
 const BOT_NAMES = ['Morwen', 'Aelar', 'Drax'];
 
 // v3.7: definição dos 3 magos jogáveis
@@ -5003,8 +5011,12 @@ function createEntity(x, y, color, emoji, isBot, heroKey) {
       heroLevel = save.heroProgress[hk].level || 1;
       levelMods = getHeroLevelMods(heroLevel);
     }
+  } else {
+    // v3.204 TESTE: o bot também começa no nível máximo (oponente forte).
+    heroLevel = MAX_HERO_LEVEL;
+    levelMods = getHeroLevelMods(MAX_HERO_LEVEL);
   }
-  const baseHp = 150 + levelMods.hpBonus;
+  const baseHp = 165 + levelMods.hpBonus;   // v3.205: HP inicial 165
   const baseMaxMana = MAX_MANA + levelMods.manaMaxBonus;
   
   return {
@@ -10799,9 +10811,12 @@ function drawMageSpriteFromImage(e, charX, charY) {
 // Animações: idle bobbing, walk sway (sincronizado com joystick/movimento), cast flash.
 // v3.108: ponte entre o jogo 2D e o sistema 3D (Three.js)
 // Retorna true se o mago foi renderizado em 3D (e portanto o 2D deve ser pulado)
-let USE_3D_AELAR = true; // flag: usar 3D pro Aelar
+let USE_3D_AELAR = true; // flag: usar 3D pros magos com modelo
 function mageHas3D(e) {
-  return USE_3D_AELAR && e.heroKey === 'AELAR' && window.Runecast3D && window.Runecast3D.ready && window.Runecast3D.enabled;
+  // v3.206: 3D para qualquer herói que tenha modelo carregado (Aelar, Drax...).
+  return USE_3D_AELAR && e && e.heroKey && window.Runecast3D && window.Runecast3D.ready
+    && window.Runecast3D.enabled && window.Runecast3D.models
+    && !!window.Runecast3D.models[e.heroKey];
 }
 function registerMage3D(e, charX, charY) {
   if (!mageHas3D(e)) return false;
@@ -10809,7 +10824,7 @@ function registerMage3D(e, charX, charY) {
   const id = (e === GAME.player) ? 'player' : 'bot';
   // garante instância
   if (!R3D.mages[id]) {
-    if (!R3D.spawnMage(id)) return false;
+    if (!R3D.spawnMage(id, e.heroKey)) return false;
   }
   // estado da animação (reaproveita getEntitySpriteState)
   let state = (typeof getEntitySpriteState === 'function') ? getEntitySpriteState(e) : 'idle';
@@ -12293,10 +12308,13 @@ function startMatch(diff) {
   
   resizeCanvas();
   
-  // v3.8: usa configuração do mago selecionado + ultimate específica
+  // v3.206: o bot é sorteado entre os heróis LIBERADOS, excluindo o que o
+  // jogador escolheu. Ao liberar mais magos, o sorteio se expande sozinho.
   const hero = HEROES[GAME.selectedHero];
-  const otherHeroes = Object.keys(HEROES).filter(h => h !== GAME.selectedHero);
-  const botHeroKey = otherHeroes[Math.floor(Math.random() * otherHeroes.length)];
+  const botPool = UNLOCKED_HEROES.filter(h => h !== GAME.selectedHero);
+  const botHeroKey = botPool.length
+    ? botPool[Math.floor(Math.random() * botPool.length)]
+    : GAME.selectedHero;   // fallback: se só houver 1 liberado, usa o mesmo
   const botHero = HEROES[botHeroKey];
   
   GAME.player = createEntity(worldSize.w * 0.5, worldSize.h * 0.85, hero.color, hero.emoji, false, GAME.selectedHero);
@@ -13165,7 +13183,11 @@ function onTap(element, handler) {
 }
 
 document.querySelectorAll('.hero-card').forEach(btn => {
-  onTap(btn, () => selectHero(btn.dataset.hero));
+  onTap(btn, () => {
+    // v3.206: ignora cards bloqueados (só AELAR e DRAX são jogáveis)
+    if (btn.dataset.locked === 'true') return;
+    selectHero(btn.dataset.hero);
+  });
 });
 document.querySelectorAll('.difficulty-btn').forEach(btn => {
   onTap(btn, () => {
@@ -13464,16 +13486,33 @@ function b64ToArrayBuffer(b64) {
 }
 
 // Mapeia estado do jogo -> nome da animação no GLB
-const ANIM_MAP = {
-  idle:         'Walking',          // não tem idle puro; usaremos Walking pausado/lento como fallback
-  walking:      'Walking',
-  walking_back: 'Walking',
-  side:         'Walking',
-  running:      'Running',
-  cast:         'Charged_Spell_Cast',
-  hit:          'Hit_Reaction_to_Waist',
-  death:        'Dead',
+// v3.206: ANIM_MAP por herói — Aelar e Drax têm clipes diferentes.
+// Aelar: Charged_Spell_Cast, Walking, Running, Dead, Hit_Reaction_to_Waist (sem idle real)
+// Drax: Axe_Spin_Attack, Idle_02 (idle real!), Walking, Running, Dead, Hit_Reaction_to_Waist
+const ANIM_MAP_BY_HERO = {
+  AELAR: {
+    idle:         'Walking',
+    walking:      'Walking',
+    walking_back: 'Walking',
+    side:         'Walking',
+    running:      'Running',
+    cast:         'Charged_Spell_Cast',
+    hit:          'Hit_Reaction_to_Waist',
+    death:        'Dead',
+  },
+  DRAX: {
+    idle:         'Idle_02',
+    walking:      'Walking',
+    walking_back: 'Walking',
+    side:         'Walking',
+    running:      'Running',
+    cast:         'Axe_Spin_Attack',
+    hit:          'Hit_Reaction_to_Waist',
+    death:        'Dead',
+  },
 };
+// fallback para código que ainda referencie ANIM_MAP (Aelar)
+const ANIM_MAP = ANIM_MAP_BY_HERO.AELAR;
 
 R3D.init = function() {
   if (R3D.scene) return;
@@ -13505,22 +13544,25 @@ R3D.init = function() {
 
   R3D.clock = new THREE.Clock();
 
-  // CONVERSÃO: carrega o GLB de URL externa (em vez do base64 embutido).
-  // Esta é a ÚNICA mudança em relação à v3.113 original que funcionava.
+  // v3.206: MULTI-MODELO. Carrega Aelar e Drax (os dois magos 3D). Cada um fica
+  // em R3D.models[heroKey] = { model, animations }. O spawnMage usa o do herói.
+  R3D.models = {};
+  R3D.modelUrls = { AELAR: 'aelar_3d.glb', DRAX: 'drax_otimizado.glb' };
   const loader = new GLTFLoader();
-  try {
-    loader.load('aelar_3d.glb', (gltf) => {
-      R3D.baseModel = gltf.scene;
-      R3D.baseAnimations = gltf.animations;
+  let loadedCount = 0;
+  const totalToLoad = Object.keys(R3D.modelUrls).length;
+  Object.keys(R3D.modelUrls).forEach((heroKey) => {
+    loader.load(R3D.modelUrls[heroKey], (gltf) => {
+      const model = gltf.scene;
       // v3.113: corrige transparência — força materiais opacos com depth test/write
-      R3D.baseModel.traverse((obj) => {
+      model.traverse((obj) => {
         if (obj.isMesh && obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
           mats.forEach((mat) => {
             mat.transparent = false;
             mat.depthWrite = true;
             mat.depthTest = true;
-            mat.alphaTest = 0.5;   // recorta bordas semi-transparentes
+            mat.alphaTest = 0.5;
             mat.side = THREE.FrontSide;
             mat.needsUpdate = true;
           });
@@ -13529,14 +13571,17 @@ R3D.init = function() {
           obj.frustumCulled = false;
         }
       });
-      R3D.ready = true;
-      console.log('[3D] Aelar carregado (URL externa).', gltf.animations.length, 'animações');
+      R3D.models[heroKey] = { model: model, animations: gltf.animations };
+      loadedCount++;
+      console.log('[3D]', heroKey, 'carregado.', gltf.animations.length, 'animações:',
+        gltf.animations.map(a => a.name).join(', '));
+      // mantém compat com código antigo (Aelar como base default)
+      if (heroKey === 'AELAR') { R3D.baseModel = model; R3D.baseAnimations = gltf.animations; }
+      if (loadedCount >= 1) R3D.ready = true;   // pronto assim que o 1º carregar
     }, undefined, (err) => {
-      console.error('[3D] erro ao carregar GLB da URL:', err);
+      console.error('[3D] erro ao carregar', heroKey, err);
     });
-  } catch (e) {
-    console.error('[3D] erro no load:', e);
-  }
+  });
 
   R3D.resize();
   window.addEventListener('resize', R3D.resize);
@@ -13570,19 +13615,22 @@ R3D.resize = function() {
 };
 
 // Cria uma instância 3D do mago pra um id (player/bot)
-R3D.spawnMage = function(id) {
-  if (!R3D.ready || !R3D.baseModel) return false;
+R3D.spawnMage = function(id, heroKey) {
+  if (!R3D.ready) return false;
   if (R3D.mages[id]) return true; // já existe
+  // v3.206: escolhe o modelo do herói. Fallback para Aelar (baseModel).
+  const entry = (heroKey && R3D.models[heroKey]) ? R3D.models[heroKey]
+              : (R3D.models['AELAR'] || null);
+  if (!entry || !entry.model) return false;
   // Clona o modelo (SkeletonUtils preserva o rig pra SkinnedMesh)
-  const model = skeletonClone(R3D.baseModel);
+  const model = skeletonClone(entry.model);
   const mixer = new THREE.AnimationMixer(model);
   const actions = {};
-  for (const clip of R3D.baseAnimations) {
+  for (const clip of entry.animations) {
     actions[clip.name] = mixer.clipAction(clip);
   }
 
   // v3.109b: NORMALIZA o modelo pra altura 1.0 unidade (base).
-  // O tamanho real na cena é aplicado depois, proporcional ao mago 2D.
   const box = new THREE.Box3().setFromObject(model);
   const size = new THREE.Vector3();
   box.getSize(size);
@@ -13600,8 +13648,8 @@ R3D.spawnMage = function(id) {
   pivot.add(model);
 
   R3D.scene.add(pivot);
-  R3D.mages[id] = { root: pivot, model, mixer, actions, currentAction: null, currentState: null, normScale };
-  console.log('[3D] mago', id, 'altura original', modelHeight.toFixed(2), 'normScale', normScale.toFixed(4));
+  R3D.mages[id] = { root: pivot, model, mixer, actions, currentAction: null, currentState: null, normScale, heroKey: heroKey || 'AELAR' };
+  console.log('[3D] mago', id, '(' + (heroKey||'AELAR') + ') altura', modelHeight.toFixed(2), 'normScale', normScale.toFixed(4));
   return true;
 };
 
@@ -13666,13 +13714,15 @@ R3D.updateMage = function(id, gs) {
     m.root.rotation.y = gs.facingAngle;
   }
 
-  // Animação por estado
-  const animName = ANIM_MAP[gs.state] || 'Walking';
+  // Animação por estado — v3.206: usa o mapa do herói daquele mago
+  const animMap = ANIM_MAP_BY_HERO[m.heroKey] || ANIM_MAP_BY_HERO.AELAR;
+  const animName = animMap[gs.state] || 'Walking';
   const loop = (gs.state !== 'death' && gs.state !== 'cast' && gs.state !== 'hit');
   if (m.currentState !== gs.state) {
     playAction(m, animName, loop);
     m.currentState = gs.state;
-    if (gs.state === 'idle' && m.actions['Walking']) {
+    // Aelar não tem idle real: usa Walking pausado. Drax tem Idle_02 de verdade.
+    if (gs.state === 'idle' && animName === 'Walking' && m.actions['Walking']) {
       m.actions['Walking'].timeScale = 0.0;
     } else if (m.actions[animName]) {
       m.actions[animName].timeScale = 1.0;
