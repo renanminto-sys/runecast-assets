@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.206 — Drax 3D + selecao bloqueada</title>
+<title>Runecast v3.207 — diag animacao Drax</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -10828,8 +10828,9 @@ function registerMage3D(e, charX, charY) {
   }
   // estado da animação (reaproveita getEntitySpriteState)
   let state = (typeof getEntitySpriteState === 'function') ? getEntitySpriteState(e) : 'idle';
-  // mapeia walking_back/side -> walking (3D rotaciona sozinho)
+  // mapeia walking_back/side -> walking, e idle_back -> idle (3D rotaciona sozinho)
   if (state === 'walking_back' || state === 'side') state = 'walking';
+  if (state === 'idle_back') state = 'idle';
   // ângulo de facing baseado na velocidade
   let facingAngle = e._lastFacingAngle || 0;
   const sp = Math.hypot(e.vx || 0, e.vy || 0);
@@ -13717,6 +13718,10 @@ R3D.updateMage = function(id, gs) {
   // Animação por estado — v3.206: usa o mapa do herói daquele mago
   const animMap = ANIM_MAP_BY_HERO[m.heroKey] || ANIM_MAP_BY_HERO.AELAR;
   const animName = animMap[gs.state] || 'Walking';
+  // v3.207 DIAG: registra o que está tocando (visível p/ depurar no aparelho)
+  window.__anim3d = window.__anim3d || {};
+  window.__anim3d[id] = m.heroKey + ': estado=' + gs.state + ' anim=' + animName +
+    ' existe=' + (!!m.actions[animName]);
   const loop = (gs.state !== 'death' && gs.state !== 'cast' && gs.state !== 'hit');
   if (m.currentState !== gs.state) {
     playAction(m, animName, loop);
@@ -13756,6 +13761,18 @@ R3D.setEnabled = function(on) {
 
 window.Runecast3D = R3D;
 R3D.scaleMul = 0.54;   // v3.202: escala fixada (era 0.5)
+
+// v3.207: overlay de diagnóstico de animação (temporário) — mostra no aparelho
+// qual estado/animação está tocando para cada mago 3D.
+window.addEventListener('load', () => {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;top:60px;left:6px;z-index:99999;background:rgba(0,0,0,0.75);color:#0ff;font:11px monospace;padding:6px 8px;border-radius:6px;max-width:90vw;pointer-events:none;white-space:pre-line';
+  document.body.appendChild(ov);
+  setInterval(() => {
+    const a = window.__anim3d || {};
+    ov.textContent = 'ANIM 3D\n' + (a.player ? 'P ' + a.player : 'P -') + '\n' + (a.bot ? 'B ' + a.bot : 'B -');
+  }, 200);
+});
 
 // v3.110: slider de calibração de escala
 (function() {
