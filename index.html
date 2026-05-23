@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.212 — cast timeScale fix</title>
+<title>Runecast v3.213 — idle estatico + cast robusto</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13673,21 +13673,17 @@ R3D.clearMages = function() {
 function playAction(m, animName, loop = true) {
   const action = m.actions[animName];
   if (!action) return;
-  if (m.currentAction === action) return;
-  // para todas as outras actions deste mago
+  // v3.213: para todas as outras (sem early-return que travava o recast)
   for (const name in m.actions) {
-    if (name !== animName) {
-      const other = m.actions[name];
-      other.fadeOut(0.15);
-    }
+    if (m.actions[name] !== action) m.actions[name].fadeOut(0.12);
   }
   action.reset();
   action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
   action.clampWhenFinished = !loop;
   action.setEffectiveWeight(1.0);
-  action.timeScale = 1.0;   // v3.212: SEMPRE velocidade normal (evita herdar 0 de idle pausado)
+  action.timeScale = 1.0;
   action.enabled = true;
-  action.fadeIn(0.15);
+  action.fadeIn(0.12);
   action.play();
   m.currentAction = action;
 }
@@ -13737,18 +13733,34 @@ R3D.updateMage = function(id, gs) {
     ' existe=' + (!!m.actions[animName]);
   // v3.211: marca quando cast foi visto (pra confirmar se o estado chega)
   if (gs.state === 'cast') { window.__castSeen = window.__castSeen || {}; window.__castSeen[id] = Date.now(); }
-  // v3.210: cast agora em LOOP — animações de cast curtas (ex: Axe_Spin 0.63s)
-  // tocavam uma vez e congelavam, ficando quase invisíveis. Em loop, o gesto se
-  // repete durante todo o lançamento. Só death/hit tocam uma vez.
-  const loop = (gs.state !== 'death' && gs.state !== 'hit');
-  if (m.currentState !== gs.state) {
-    playAction(m, animName, loop);
-    m.currentState = gs.state;
-    // Aelar não tem idle real: usa Walking pausado. Drax tem Idle_02 de verdade.
-    if (gs.state === 'idle' && animName === 'Walking' && m.actions['Walking']) {
-      m.actions['Walking'].timeScale = 0.0;
-    } else if (m.actions[animName]) {
-      m.actions[animName].timeScale = 1.0;
+  // v3.213: controle de animação simplificado e robusto.
+  // - idle do Drax: pose ESTÁTICA (sem animação atrelada, congela num frame neutro)
+  // - cast: SEMPRE toca a animação de ataque
+  // Compara pela ANIMAÇÃO alvo (não pelo estado) para nunca travar.
+  const isDraxIdle = (m.heroKey === 'DRAX' && gs.state === 'idle');
+
+  if (isDraxIdle) {
+    // pose estática: garante uma animação base parada e a congela
+    if (m.currentAnimName !== '__static') {
+      const poseClip = m.actions['Running'] || m.actions['Dead'] || m.currentAction;
+      if (poseClip) {
+        for (const n in m.actions) { if (m.actions[n] !== poseClip) m.actions[n].stop(); }
+        poseClip.reset(); poseClip.play(); poseClip.timeScale = 0.0; // congela
+        m.currentAction = poseClip;
+      }
+      m.currentAnimName = '__static';
+      m.currentState = gs.state;
+    }
+  } else {
+    const loop = (gs.state !== 'death' && gs.state !== 'hit');
+    if (m.currentAnimName !== animName) {
+      playAction(m, animName, loop);
+      m.currentAnimName = animName;
+      m.currentState = gs.state;
+      // idle do Aelar (sem idle real): usa Walking pausado
+      if (gs.state === 'idle' && animName === 'Walking' && m.actions['Walking']) {
+        m.actions['Walking'].timeScale = 0.0;
+      }
     }
   }
 };
