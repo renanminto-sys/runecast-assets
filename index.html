@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.174 — angulo moderado + sliders novos</title>
+<title>Runecast v3.177 — formula escala v3.113 (mul 0.5)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10740,11 +10740,11 @@ const RUNECAST_3D = (function () {
       // câmera ortográfica inclinada (v3.113). Frustum dimensionado em unidades
       // de mundo no resize(). Posição/ângulo idênticos à versão que funcionava.
       camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-      // v3.174: ângulo de cima MODERADO (~30°). Frontal puro (v3.169) deixava
-      // frente/costas ambíguas neste modelo; 47° deitava. 30° distingue as
-      // costas (vê topo da cabeça ao virar) sem deitar nem andar na parede.
-      camera.position.set(0, 3, 5);
-      camera.lookAt(0, 1.0, 0);
+      // v3.176: VOLTA à câmera EXATA da v3.113 (0,11,9 olhando 0,1.2,0). O
+      // usuário PROVOU que a v3.113 mostra as costas. A câmera frontal (v3.174)
+      // foi o que tirou as costas. Esta câmera de cima é a que funciona.
+      camera.position.set(0, 11, 9);
+      camera.lookAt(0, 1.2, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 1.4));
       const dir = new THREE.DirectionalLight(0xffffff, 1.6);
       dir.position.set(3, 10, 6); scene.add(dir);
@@ -10978,14 +10978,11 @@ const RUNECAST_3D = (function () {
       const vy = e.vy || 0;
       const sp = Math.hypot(vx, vy);
       if (sp > 0.3) {
-        // v3.171: com câmera FRONTAL (olha -Z, frente do modelo em +Z), para
-        // subir (vy<0) mostrar COSTAS (PI): atan2(vx, vy). descer->0 (frente).
-        model._facingAngle = Math.atan2(vx, vy);
+        // v3.176: atan2 da v3.113 — rotação COMPLETA (até 180° = costas reais).
+        // O modelo TEM costas (provado). Com a câmera de cima, subir->costas.
+        model._facingAngle = Math.atan2(-(vx), -(vy));
       }
       if (model.root && model._facingAngle !== undefined) {
-        // v3.165: gira o ROOT (pivot), exatamente como a v3.113. O inner está
-        // centrado dentro dele, então o mago gira em torno do próprio eixo
-        // vertical, em pé — sem deitar nem orbitar.
         model.root.rotation.set(0, model._facingAngle, 0);
       }
       window.__dbg3d.faseLabel = 'rootRotY='+(model.root?model.root.rotation.y.toFixed(2):'?')+
@@ -11009,25 +11006,27 @@ const RUNECAST_3D = (function () {
       // o mago fica exatamente onde está no jogo, e a câmera inclinada o vê em
       // pé e coerente com a cena. NÃO copiamos imagem — o canvas já está sobre
       // a arena.
-      // v3.169: posiciona no PLANO VERTICAL da tela (z=0), não no chão
-      // horizontal. Como a arena 2D é vista de frente, o mago vive no mesmo
-      // plano dela. unproject num plano z=0 mapeia pixel -> posição no plano.
+      // v3.176: VOLTA ao unproject no CHÃO horizontal (plano y=0), como a
+      // v3.113. Com a câmera de cima, o mago no chão é visto em pé e de costas
+      // ao subir — exatamente como na versão que o usuário provou funcionar.
       const W = api._w || 1, H = api._h || 1;
       const ndcX = (charX / W) * 2 - 1;
       const ndcY = -((charY / H) * 2 - 1);
-      if (!api._planeZ0) api._planeZ0 = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
       api._ray.setFromCamera({ x: ndcX, y: ndcY }, camera);
       const hit = new THREE.Vector3();
-      if (api._ray.ray.intersectPlane(api._planeZ0, hit)) {
-        // posiciona pelos pés: o modelo tem pés em ~y=0, então alinha hit.y aos pés
-        model.root.position.set(hit.x, hit.y, 0);
+      if (api._ray.ray.intersectPlane(api._planeY0, hit)) {
+        model.root.position.set(hit.x, 0, hit.z);
       }
-      // v3.168: ALTURA NATIVA REAL = ~1.0 unidade (medida pelos ossos: cabeça
-      // em y=1.06, pés em y=0.09). NÃO é 2.56 — eu vinha escalando errado por
-      // 2.5x! O modelo já vem em ~1 unidade. Escala desejada vem do calib.
       const NATIVE_H = 1.0;
-      const worldH = (window.__calib3d && window.__calib3d.worldH) || 2.0;
-      model.root.scale.setScalar(worldH / NATIVE_H);
+      // v3.177: fórmula de escala EXATA da v3.113. mage2DHeightPx = PLAYER_RADIUS
+      // * 2.8 = 67.2. targetUnits = (67.2/alturaArena) * viewWorldH(8) * mul(0.5).
+      // Offsets X/Y = 0 (confirmado pelo usuário). Escala 3D mul = 0.5.
+      const mage2DHeightPx = 24 * 2.8;             // PLAYER_RADIUS * 2.8
+      const Harena = api._h || 1;
+      const viewWorldH = (camera.top - camera.bottom) || 8;
+      const mul = (window.__calib3d && window.__calib3d.mul) || 0.5;
+      const targetUnits = (mage2DHeightPx / Harena) * viewWorldH * mul;
+      model.root.scale.setScalar(targetUnits);
 
       // v3.167 DIAGNÓSTICO no aparelho: mede cabeça vs pés na tela após
       // atualizar as matrizes. hY > fY = em pé; senão = deitado.
@@ -11063,12 +11062,7 @@ const RUNECAST_3D = (function () {
   function render3D() {
     if (!renderer || !api.available || !api.enabled) return;
     try {
-      // v3.174: ângulo da câmera ajustável ao vivo (slider camY)
-      if (window.__calib3d && window.__calib3d.camY && camera) {
-        camera.position.set(0, window.__calib3d.camY, 5);
-        camera.lookAt(0, 1.0, 0);
-        camera.updateProjectionMatrix();
-      }
+      // v3.176: câmera FIXA na posição da v3.113 (não sobrescreve por slider).
       renderer.render(scene, camera);
     } catch (err) {
       console.warn('[3d] render falhou, desativando:', err);
@@ -13828,7 +13822,7 @@ window.addEventListener('load', () => {
 // v3.162: painel de CALIBRAÇÃO do mago 3D — sliders ao vivo. Ajuste e me passe
 // os valores. Toque em "ESCONDER" para ocultar.
 window.addEventListener('load', () => {
-  window.__calib3d = window.__calib3d || { worldH: 2.0, camY: 3 };
+  window.__calib3d = window.__calib3d || { mul: 0.5 };
 
   const panel = document.createElement('div');
   panel.style.cssText = 'position:fixed;bottom:env(safe-area-inset-bottom,8px);left:4px;right:4px;z-index:2147483647;background:rgba(0,0,0,.9);color:#0f0;font:12px monospace;padding:10px 12px;border-radius:10px;line-height:1.6;pointer-events:auto;border:1px solid #0f06';
@@ -13864,8 +13858,7 @@ window.addEventListener('load', () => {
   title.textContent = 'CALIBRAR MAGO 3D';
   title.style.cssText = 'color:#fff;font-weight:bold;margin-bottom:4px';
   panel.appendChild(title);
-  panel.appendChild(makeSlider('Tamanho 3D', 'worldH', 0.5, 5, 0.1, window.__calib3d.worldH || 2.0));
-  panel.appendChild(makeSlider('Câmera altura', 'camY', 0.5, 11, 0.5, window.__calib3d.camY || 3));
+  panel.appendChild(makeSlider('Escala 3D', 'mul', 0.1, 2, 0.05, window.__calib3d.mul || 0.5));
 
   const hint = document.createElement('div');
   hint.style.cssText = 'color:#888;font-size:10px;margin-top:6px';
