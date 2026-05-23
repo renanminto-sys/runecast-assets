@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.213 — idle estatico + cast robusto</title>
+<title>Runecast v3.215 — fix walking Aelar</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13510,7 +13510,7 @@ const ANIM_MAP_BY_HERO = {
     walking_back: 'Walking',
     side:         'Walking',
     running:      'Walking',
-    cast:         'Axe_Spin_Attack',
+    cast:         'Run_03',           // v3.214: gesto mais expressivo (agacha/gira) = parece ataque. Axe_Spin parecia corrida.
     hit:          'Hit_Reaction_to_Waist',
     death:        'Idle_02',           // "Idle_02" = animação de queda = morte real
   },
@@ -13740,15 +13740,20 @@ R3D.updateMage = function(id, gs) {
   const isDraxIdle = (m.heroKey === 'DRAX' && gs.state === 'idle');
 
   if (isDraxIdle) {
-    // pose estática: garante uma animação base parada e a congela
-    if (m.currentAnimName !== '__static') {
-      const poseClip = m.actions['Running'] || m.actions['Dead'] || m.currentAction;
-      if (poseClip) {
-        for (const n in m.actions) { if (m.actions[n] !== poseClip) m.actions[n].stop(); }
-        poseClip.reset(); poseClip.play(); poseClip.timeScale = 0.0; // congela
-        m.currentAction = poseClip;
+    // v3.214: idle = A-POSE PURA (bind pose do modelo). Para TODAS as animações
+    // e zera a influência, fazendo o esqueleto voltar à pose de descanso original.
+    if (m.currentAnimName !== '__apose') {
+      for (const n in m.actions) {
+        m.actions[n].stop();
+        m.actions[n].setEffectiveWeight(0);
+        m.actions[n].enabled = false;
       }
-      m.currentAnimName = '__static';
+      // reseta o esqueleto pra bind pose (A-pose original do GLB)
+      if (m.model && m.model.traverse) {
+        m.model.traverse(o => { if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose(); });
+      }
+      m.currentAction = null;
+      m.currentAnimName = '__apose';
       m.currentState = gs.state;
     }
   } else {
@@ -13757,10 +13762,14 @@ R3D.updateMage = function(id, gs) {
       playAction(m, animName, loop);
       m.currentAnimName = animName;
       m.currentState = gs.state;
-      // idle do Aelar (sem idle real): usa Walking pausado
-      if (gs.state === 'idle' && animName === 'Walking' && m.actions['Walking']) {
-        m.actions['Walking'].timeScale = 0.0;
-      }
+    }
+    // v3.215: ajuste de timeScale SEMPRE (não só na troca). O Aelar usa "Walking"
+    // tanto para idle (pausado) quanto para andar (normal) — então a troca
+    // idle<->walking NÃO muda o nome da animação, e o timeScale precisa ser
+    // corrigido a cada frame, senão fica preso pausado.
+    if (m.currentAction) {
+      const wantPaused = (gs.state === 'idle' && animName === 'Walking');
+      m.currentAction.timeScale = wantPaused ? 0.0 : 1.0;
     }
   }
 };
