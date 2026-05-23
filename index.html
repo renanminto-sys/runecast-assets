@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.219 — arena 3D revertida, dano mantido</title>
+<title>Runecast v3.220 — idle Drax pose neutra</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13815,11 +13815,12 @@ R3D.updateMage = function(id, gs) {
   const isDraxIdle = (m.heroKey === 'DRAX' && gs.state === 'idle');
 
   if (isDraxIdle) {
-    // v3.216: idle estático SEM sumir. A abordagem skeleton.pose() degenerava o
-    // mesh (sumia). Agora: toca uma animação de pose parada e CONGELA no 1º frame
-    // com PESO TOTAL (time=0, timeScale=0). O modelo fica visível e imóvel.
+    // v3.220: idle = pose NEUTRA de pé. Medição encontrou que o início da anim
+    // "Dead" (~3% do tempo) é a melhor pose parada (ereto, pés no chão, braços
+    // ao lado). Congela nesse frame com peso total. (Antes usava "Running" no
+    // frame 0, que pegava uma pose de meio-corrida — parecia voar/correr.)
     if (m.currentAnimName !== '__idleStatic') {
-      const poseClip = m.actions['Running'] || m.actions['Dead'] || Object.values(m.actions)[0];
+      const poseClip = m.actions['Dead'] || m.actions['Running'] || Object.values(m.actions)[0];
       for (const n in m.actions) {
         if (m.actions[n] !== poseClip) { m.actions[n].stop(); }
       }
@@ -13828,7 +13829,8 @@ R3D.updateMage = function(id, gs) {
         poseClip.enabled = true;
         poseClip.setEffectiveWeight(1.0);
         poseClip.play();
-        poseClip.time = 0;          // primeiro frame
+        // congela na pose neutra (3% da duração do clip = em pé, antes de cair)
+        poseClip.time = (poseClip.getClip().duration || 1) * 0.03;
         poseClip.timeScale = 0;     // congelado
         m.currentAction = poseClip;
       }
