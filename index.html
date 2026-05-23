@@ -6,7 +6,17 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.178 — spawnMage EXATO da v3.113</title>
+<title>Runecast v3.200 — v3.113 base + GLB externo</title>
+<!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js",
+    "three/addons/loaders/GLTFLoader.js": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -2854,15 +2864,6 @@
   .win h2 { color: #81c784; text-shadow: 0 0 20px #81c784, 0 0 40px #81c784; }
   .lose h2 { color: #ef5350; text-shadow: 0 0 20px #ef5350, 0 0 40px #ef5350; }
 </style>
-
-<!-- =====================================================================
-     v3.110: MÓDULO 3D — carregamento NÃO-BLOQUEANTE
-     'defer' garante que o jogo carregue PRIMEIRO; o Three.js entra depois.
-     Se a CDN falhar, window.THREE fica indefinido e o jogo segue 100% em 2D.
-     A ORDEM importa: GLTFLoader depende de THREE, então three vem antes.
-     ===================================================================== -->
-<script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 </head>
 <body>
 <!-- v3.75: Tela de loading mostrada IMEDIATAMENTE (antes do JS processar tudo) -->
@@ -2984,7 +2985,7 @@
         <span class="icon-label">Fullscreen</span>
       </button>
     </div>
-    <div class="version-tag">v3.107</div>
+    <div class="version-tag">v3.113</div>
   </div>
   
   <!-- v3.89: MENU PRINCIPAL (home screen) — primeira tela depois da splash -->
@@ -3031,7 +3032,7 @@
         </button>
       </div>
     </div>
-    <div class="version-tag">v3.107</div>
+    <div class="version-tag">v3.113</div>
   </div>
   
   <!-- v3.97: Tela da Loja -->
@@ -3631,6 +3632,16 @@
     <canvas id="arena-canvas"></canvas>
     <canvas id="three-canvas"></canvas>
     <canvas id="fx-canvas"></canvas>
+    <!-- v3.110: controle de escala 3D pra calibração (debug) -->
+    <div id="scale3d-debug" style="position:absolute; top:calc(50px + env(safe-area-inset-top,0px)); left:50%; transform:translateX(-50%); z-index:9999; background:rgba(0,0,0,0.85); padding:10px 14px; border-radius:10px; display:none; flex-direction:column; gap:6px; align-items:center; color:#fff; font-size:12px; pointer-events:auto; touch-action:none;">
+      <div>Escala 3D: <span id="scale3d-val">0.50</span></div>
+      <input type="range" id="scale3d-slider" min="0.1" max="2" step="0.02" value="0.5" style="width:160px;">
+      <div>Offset X: <span id="offx3d-val">0</span></div>
+      <input type="range" id="offx3d-slider" min="-300" max="300" step="5" value="0" style="width:160px;">
+      <div>Offset Y: <span id="offy3d-val">0</span></div>
+      <input type="range" id="offy3d-slider" min="-300" max="300" step="5" value="0" style="width:160px;">
+      <div style="font-size:9px; opacity:0.7;">calibre posição e escala</div>
+    </div>
     
     <!-- Joystick zone (metade esquerda) -->
     <div id="joystick-zone">
@@ -7505,6 +7516,7 @@ function isOnUIButton(target) {
     target.closest('#capture-modal') ||
     target.closest('#export-modal') ||
     target.closest('#calibrate-screen') ||
+    target.closest('#scale3d-debug') ||
     // v3.23: barra de loadout inferior (clicar nela abre preview, não inicia cast)
     target.closest('#loadout-bar') ||
     target.closest('#quit-modal')
@@ -8556,10 +8568,6 @@ function spawnSmokeEffect(entity) {
   }
 }
 
-// v3.108 perf: teto de segurança de partículas. Em jogo normal NUNCA é
-// atingido (o pico fica bem abaixo), então o visual é idêntico. Serve só
-// para garantir que, com o 3D somado, nunca haja um pico que estoure o frame.
-const MAX_PARTICLES = 240;
 function spawnParticles(x, y, color, count) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -8571,10 +8579,6 @@ function spawnParticles(x, y, color, count) {
       life: 0.6, maxLife: 0.6,
       color, size: 3 + Math.random() * 3
     });
-  }
-  // Se passou do teto, descarta as MAIS ANTIGAS (início do array)
-  if (GAME.particles.length > MAX_PARTICLES) {
-    GAME.particles.splice(0, GAME.particles.length - MAX_PARTICLES);
   }
 }
 
@@ -9364,17 +9368,13 @@ function _gameTickImpl(now) {
       p.life -= dt;
       return p.life > 0;
     });
-    // v3.108 perf: salvaguarda do teto (cobre pushes diretos que não passam
-    // por spawnParticles). Descarta as mais antigas se exceder.
-    if (GAME.particles.length > MAX_PARTICLES) {
-      GAME.particles.splice(0, GAME.particles.length - MAX_PARTICLES);
-    }
   }
   
   renderArena();
-  // v3.166: renderiza a cena 3D uma vez por frame (após posicionar os magos no
-  // renderArena). Arquitetura v3.113: canvas único sobre a arena.
-  if (typeof RUNECAST_3D !== 'undefined' && RUNECAST_3D.render3D) RUNECAST_3D.render3D();
+  // v3.108: renderiza a camada 3D (magos) por cima da arena 2D
+  if (window.Runecast3D && window.Runecast3D.enabled) {
+    window.Runecast3D.render();
+  }
   updateRuneButtons();
   
   requestAnimationFrame(gameTick);
@@ -10127,21 +10127,17 @@ function renderArena() {
   }
   
   // Partículas (projetadas)
-  // v3.108 perf: estado de contexto setado UMA vez fora do loop (em vez de
-  // save()/restore() por partícula). Visual idêntico, bem mais barato.
-  if (GAME.particles.length > 0) {
+  for (const p of GAME.particles) {
+    const alpha = p.life / p.maxLife;
+    const proj = project(p.x, p.y);
     fxCtx.save();
-    for (const p of GAME.particles) {
-      const alpha = p.life / p.maxLife;
-      const proj = project(p.x, p.y);
-      fxCtx.globalAlpha = alpha;
-      fxCtx.fillStyle = p.color;
-      fxCtx.shadowColor = p.color;
-      fxCtx.shadowBlur = 8;
-      fxCtx.beginPath();
-      fxCtx.arc(proj.x, proj.y, p.size * alpha, 0, Math.PI * 2);
-      fxCtx.fill();
-    }
+    fxCtx.globalAlpha = alpha;
+    fxCtx.fillStyle = p.color;
+    fxCtx.shadowColor = p.color;
+    fxCtx.shadowBlur = 8;
+    fxCtx.beginPath();
+    fxCtx.arc(proj.x, proj.y, p.size * alpha, 0, Math.PI * 2);
+    fxCtx.fill();
     fxCtx.restore();
   }
   
@@ -10661,381 +10657,6 @@ function drawSpearProjectile(p, x, y) {
 // =====================================================================
 // v3.105: SPRITES DE IA — sistema de carregamento e renderização
 // =====================================================================
-// =====================================================================
-// v3.109: MÓDULO 3D ISOLADO  — RUNECAST_3D
-// ---------------------------------------------------------------------
-// Renderiza um mago 3D num canvas WebGL OCULTO e oferece draw3DMage(),
-// que copia o frame para o fxCtx 2D existente. Se QUALQUER coisa falhar
-// (sem WebGL, CDN fora, modelo não carrega), o módulo se auto-desativa e
-// o jogo segue com sprites 2D / arte vetorial. NUNCA lança erro no loop.
-//
-// CONFIG: edite HERO_3D_MODELS (heroKey -> URL .glb). Comece com UM mago.
-// DESLIGAR TUDO: RUNECAST_3D.enabled = false
-// =====================================================================
-const RUNECAST_3D = (function () {
-  'use strict';
-
-  // ---- CONFIG -------------------------------------------------------
-  // Mago de teste: AELAR usa o modelo otimizado hospedado no jsDelivr.
-  // Os demais heróis não estão aqui -> continuam usando sprite 2D.
-  const HERO_3D_MODELS = {
-    AELAR: 'aelar_3d.glb'   // v3.170: modelo EXATO da v3.113 (3.2MB, texturas maiores)
-  };
-  // Plano B (se o jsDelivr falhar no seu device, troque pela linha abaixo):
-  // Plano B (se quiser carregar de fora em vez de local, troque pela URL):
-  // AELAR: 'https://raw.githubusercontent.com/renanminto-sys/runecast-assets/main/mago_otimizado.glb'
-
-  // Mapa estado do jogo -> nomes de clip REAIS do modelo do Meshy.
-  // (animações embutidas: Charged_Spell_Cast, Charged_Spell_Cast_1, Dead,
-  //  Hit_Reaction_to_Waist, Run_03, Running, Walking)
-  const ANIM_CLIP_MAP = {
-    idle:         ['Walking'],                 // sem clip idle -> usa Walking lento
-    idle_back:    ['Walking'],
-    walking:      ['Walking', 'Running', 'Run_03'],
-    walking_back: ['Walking', 'Running'],
-    side:         ['Walking', 'Running'],
-    cast:         ['Charged_Spell_Cast', 'Charged_Spell_Cast_1'],
-    hit:          ['Hit_Reaction_to_Waist'],
-    death:        ['Dead']
-  };
-  // Estados que NÃO devem ficar em loop (tocam uma vez e seguram no fim)
-  const ONCE_STATES = { cast: true, hit: true, death: true };
-  // No estado idle, deixa a animação Walking mais lenta pra parecer "respirando"
-  const IDLE_TIMESCALE = 0.35;
-
-  const RENDER_W = 256;
-  const RENDER_H = 320;
-  const TARGET_H = 130;   // altura do mago em px no canvas 2D (um pouco > sprite)
-  // v3.111: AJUSTE FINO (mexa só nestes 2 se precisar nas próximas versões):
-  //  - FRAME_MARGIN: >1 afasta a câmera (mago menor no quadro), <1 aproxima.
-  //  - TARGET_H acima: tamanho do mago na arena em pixels.
-  const FRAME_MARGIN = 1.35;
-
-  // ---- ESTADO INTERNO ----------------------------------------------
-  const api = {
-    enabled: true, available: false,
-    models: {}, loadState: {}
-  };
-  let THREE = null, renderer = null, scene = null, camera = null;
-  let glCanvas = null, clock = null, initFailed = false;
-
-  // ---- INIT (lazy, seguro) -----------------------------------------
-  function ensureInit() {
-    if (renderer || initFailed) return api.available;
-    try {
-      THREE = window.THREE;
-      if (!THREE || !THREE.WebGLRenderer) { initFailed = true; return false; }
-      // v3.166: ARQUITETURA v3.113 — renderiza num canvas VISÍVEL sobre a arena
-      // (three-canvas), não num mini-canvas isolado. Cena única, câmera
-      // ortográfica inclinada, mago posicionado no chão do mundo via unproject.
-      glCanvas = document.getElementById('three-canvas');
-      if (!glCanvas) { console.warn('[3d] three-canvas ausente'); initFailed = true; return false; }
-      renderer = new THREE.WebGLRenderer({
-        canvas: glCanvas, alpha: true, antialias: true
-      });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setClearColor(0x000000, 0); // transparente
-      if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
-      scene = new THREE.Scene();
-      // câmera ortográfica inclinada (v3.113). Frustum dimensionado em unidades
-      // de mundo no resize(). Posição/ângulo idênticos à versão que funcionava.
-      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-      // v3.176: VOLTA à câmera EXATA da v3.113 (0,11,9 olhando 0,1.2,0). O
-      // usuário PROVOU que a v3.113 mostra as costas. A câmera frontal (v3.174)
-      // foi o que tirou as costas. Esta câmera de cima é a que funciona.
-      camera.position.set(0, 11, 9);
-      camera.lookAt(0, 1.2, 0);
-      scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-      const dir = new THREE.DirectionalLight(0xffffff, 1.6);
-      dir.position.set(3, 10, 6); scene.add(dir);
-      const fill = new THREE.DirectionalLight(0x88aaff, 0.5);
-      fill.position.set(-4, 3, -3); scene.add(fill);
-      clock = new THREE.Clock();
-      api._ray = new THREE.Raycaster();
-      api._planeY0 = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-      resize3D();
-      window.addEventListener('resize', resize3D);
-      api.available = true;
-      console.log('[3d] WebGL pronto (three-canvas, arquitetura v3.113)');
-      return true;
-    } catch (err) {
-      console.warn('[3d] init falhou, usando sprites 2D:', err);
-      initFailed = true; api.available = false; return false;
-    }
-  }
-
-  // v3.166: ajusta o renderer e o frustum ao tamanho da arena (unidades mundo).
-  function resize3D() {
-    if (!renderer) return;
-    const arena = document.getElementById('arena-area');
-    const rect = arena ? arena.getBoundingClientRect()
-                       : { width: window.innerWidth, height: window.innerHeight };
-    const w = rect.width, h = rect.height;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(w, h, true);
-    if (glCanvas) {
-      glCanvas.style.width = w + 'px';
-      glCanvas.style.height = h + 'px';
-      glCanvas.style.top = '0px';
-      glCanvas.style.left = '0px';
-    }
-    api._w = w; api._h = h;
-    const aspect = w / h;
-    const viewH = (window.__calib3d && window.__calib3d.viewH) || 8;
-    camera.left = -viewH * aspect / 2;
-    camera.right = viewH * aspect / 2;
-    camera.top = viewH / 2;
-    camera.bottom = -viewH / 2;
-    camera.updateProjectionMatrix();
-  }
-
-  // ---- CARREGAMENTO -------------------------------------------------
-  function loadModel(heroKey) {
-    if (!api.enabled) return;
-    if (api.loadState[heroKey]) return;
-    if (!HERO_3D_MODELS[heroKey]) return;
-    if (!ensureInit()) return;
-    if (!THREE.GLTFLoader) { console.warn('[3d] GLTFLoader ausente'); return; }
-    api.loadState[heroKey] = 'loading';
-    const url = HERO_3D_MODELS[heroKey];
-    const loader = new THREE.GLTFLoader();
-    loader.load(url, (gltf) => {
-      try {
-        const innerModel = gltf.scene;
-        // v3.178: RÉPLICA EXATA do spawnMage da v3.113 (lido do arquivo). A
-        // v3.113 MEDE com setFromObject, normaliza para altura 1.0, e centraliza
-        // o modelo nos pés dentro de um pivot. Eu evitava isso por medo da
-        // "armadilha do Armature", mas é EXATAMENTE o que a v3.113 faz e
-        // funciona. Replico fielmente.
-        const box = new THREE.Box3().setFromObject(innerModel);
-        const size = new THREE.Vector3(); box.getSize(size);
-        const center = new THREE.Vector3(); box.getCenter(center);
-        const modelHeight = size.y || 1;
-        const normScale = 1.0 / modelHeight;   // normaliza para altura = 1 unidade
-
-        const root = new THREE.Group();   // pivot
-        innerModel.position.x = -center.x * normScale;
-        innerModel.position.z = -center.z * normScale;
-        innerModel.position.y = -box.min.y * normScale;   // pés no chão (y=0)
-        innerModel.scale.setScalar(normScale);
-        root.add(innerModel);
-
-        let mixer = null; const actions = {};
-        let firstAction = null;
-        if (gltf.animations && gltf.animations.length) {
-          mixer = new THREE.AnimationMixer(innerModel);
-          gltf.animations.forEach(clip => { actions[clip.name] = clip; });
-          firstAction = mixer.clipAction(gltf.animations[0]);
-          firstAction.play();
-        }
-        api.models[heroKey] = {
-          root, inner: innerModel, mixer, actions, animations: gltf.animations || [],
-          currentAction: firstAction, currentState: null, normScale: normScale
-        };
-        api.loadState[heroKey] = 'ready';
-        console.log('[3d]', heroKey, 'carregado (spawn v3.113). altura',
-          modelHeight.toFixed(2), 'normScale', normScale.toFixed(4));
-      } catch (e) {
-        console.warn('[3d] pós-load falhou', heroKey, e);
-        api.loadState[heroKey] = 'failed';
-      }
-    }, undefined, (err) => {
-      console.warn('[3d] modelo falhou (CORS/rede?)', heroKey, err);
-      api.loadState[heroKey] = 'failed';
-    });
-  }
-
-  function resolveClip(model, state) {
-    const cands = ANIM_CLIP_MAP[state] || [];
-    for (const n of cands) if (model.actions[n]) return n;
-    const keys = Object.keys(model.actions);
-    return keys.length ? keys[0] : null;
-  }
-
-  function setState(model, state) {
-    if (!model.mixer) return;
-    const clipName = resolveClip(model, state);
-    if (!clipName) return;
-    const sameState = (model.currentState === state);
-    model.currentState = state;
-
-    const action = model.mixer.clipAction(model.actions[clipName]);
-    const sameClip = model.currentAction && model.currentAction.getClip() === action.getClip();
-
-    // ajusta velocidade conforme o estado (idle = mais lento)
-    action.timeScale = (state === 'idle' || state === 'idle_back') ? IDLE_TIMESCALE : 1;
-
-    // se já é o mesmo clip tocando, só garante que continua ativo e sai
-    if (sameClip) {
-      if (!action.isRunning()) action.play();
-      action.enabled = true;
-      action.setEffectiveWeight(1);
-      return;
-    }
-
-    // clip novo: configura loop e toca
-    if (ONCE_STATES[state]) {
-      action.setLoop(THREE.LoopOnce, 1);
-      action.clampWhenFinished = true;
-    } else {
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      action.clampWhenFinished = false;
-    }
-    action.reset();
-    action.enabled = true;
-    action.setEffectiveWeight(1);
-    action.play();
-    if (model.currentAction && model.currentAction !== action) {
-      model.currentAction.crossFadeTo ? action.crossFadeFrom(model.currentAction, 0.2, false)
-                                      : model.currentAction.stop();
-    }
-    model.currentAction = action;
-  }
-
-  // ---- RENDER POR FRAME --------------------------------------------
-  function draw3DMage(ctx, e, charX, charY, getState) {
-    window.__dbg3d = window.__dbg3d || {calls:0, ok:0, ret:'', err:''};
-    window.__dbg3d.calls++;
-    if (!api.enabled || !api.available) { window.__dbg3d.ret='nao disponivel'; return false; }
-    const heroKey = e.heroKey;
-    if (!HERO_3D_MODELS[heroKey]) { window.__dbg3d.ret='sem modelo p/ '+heroKey; return false; }
-    if (!api.loadState[heroKey]) loadModel(heroKey);
-    const model = api.models[heroKey];
-    if (!model || api.loadState[heroKey] !== 'ready') { window.__dbg3d.ret='loadState='+api.loadState[heroKey]; return false; }
-    try {
-      // v3.117 CORREÇÃO CRÍTICA: clock.getDelta() era chamado 1x por entidade
-      // (player E bot) por frame. A 1ª chamada consumia o tempo e a 2ª (do
-      // player AELAR) recebia ~0 -> mixer.update(0) nunca avançava a animação,
-      // deixando o SkinnedMesh numa pose degenerada (sumia). Só "piscava" no
-      // frame da troca de estado (action.reset). Agora cada modelo tem seu
-      // próprio relógio independente via performance.now().
-      const tnow = performance.now();
-      if (!model._lastT) model._lastT = tnow;
-      const dt = Math.min((tnow - model._lastT) / 1000, 0.05);
-      model._lastT = tnow;
-      let state = getState ? getState(e) : 'idle';
-      // v3.151: como na versão que funcionava — walking_back e side usam a MESMA
-      // animação 'walking'; quem vira o personagem é a rotação (facingAngle).
-      if (state === 'walking_back' || state === 'side') state = 'walking';
-      if (state === 'idle_back') state = 'idle';
-      setState(model, state);
-      if (model.mixer) model.mixer.update(dt);
-
-      // v3.151: REPLICA EXATA da versão que funcionava (chat anterior).
-      // A chave: NÃO usar estados fixos (walking_back/side) com ângulos
-      // chumbados, e SIM um ângulo CONTÍNUO calculado pela direção real do
-      // movimento: facingAngle = atan2(-vx, -vy). Aplicado direto no gltf.scene
-      // (model.inner). Cima=costas, baixo=frente, laterais corretas — natural.
-      const vx = e.vx || 0;
-      const vy = e.vy || 0;
-      const sp = Math.hypot(vx, vy);
-      if (sp > 0.3) {
-        // v3.176: atan2 da v3.113 — rotação COMPLETA (até 180° = costas reais).
-        // O modelo TEM costas (provado). Com a câmera de cima, subir->costas.
-        model._facingAngle = Math.atan2(-(vx), -(vy));
-      }
-      if (model.root && model._facingAngle !== undefined) {
-        model.root.rotation.set(0, model._facingAngle, 0);
-      }
-      window.__dbg3d.faseLabel = 'rootRotY='+(model.root?model.root.rotation.y.toFixed(2):'?')+
-        ' ang='+(model._facingAngle||0).toFixed(2)+' vx='+vx.toFixed(0)+' vy='+vy.toFixed(0)+' sp='+sp.toFixed(1);
-
-      // fallback procedural (caso modelo não tenha mixer)
-      if (!model.mixer) {
-        const now = Date.now();
-        const speed = Math.sqrt((e.vx||0)**2 + (e.vy||0)**2);
-        model.root.position.y = speed > 5
-          ? Math.abs(Math.sin(now/120)) * 0.12
-          : Math.sin(now/350) * 0.05;
-      }
-
-      // garante só os magos ativos visíveis na cena compartilhada
-      if (scene.children.indexOf(model.root) === -1) scene.add(model.root);
-      model.root.visible = true;
-
-      // v3.166: POSICIONA o mago no chão do mundo 3D via UNPROJECT (igual à
-      // v3.113). charX/charY são pixels na arena; convertendo para o plano y=0
-      // o mago fica exatamente onde está no jogo, e a câmera inclinada o vê em
-      // pé e coerente com a cena. NÃO copiamos imagem — o canvas já está sobre
-      // a arena.
-      // v3.176: VOLTA ao unproject no CHÃO horizontal (plano y=0), como a
-      // v3.113. Com a câmera de cima, o mago no chão é visto em pé e de costas
-      // ao subir — exatamente como na versão que o usuário provou funcionar.
-      const W = api._w || 1, H = api._h || 1;
-      const ndcX = (charX / W) * 2 - 1;
-      const ndcY = -((charY / H) * 2 - 1);
-      api._ray.setFromCamera({ x: ndcX, y: ndcY }, camera);
-      const hit = new THREE.Vector3();
-      if (api._ray.ray.intersectPlane(api._planeY0, hit)) {
-        model.root.position.set(hit.x, 0, hit.z);
-      }
-      const NATIVE_H = 1.0;
-      // v3.177: fórmula de escala EXATA da v3.113. mage2DHeightPx = PLAYER_RADIUS
-      // * 2.8 = 67.2. targetUnits = (67.2/alturaArena) * viewWorldH(8) * mul(0.5).
-      // Offsets X/Y = 0 (confirmado pelo usuário). Escala 3D mul = 0.5.
-      const mage2DHeightPx = 24 * 2.8;             // PLAYER_RADIUS * 2.8
-      const Harena = api._h || 1;
-      const viewWorldH = (camera.top - camera.bottom) || 8;
-      const mul = (window.__calib3d && window.__calib3d.mul) || 0.5;
-      const targetUnits = (mage2DHeightPx / Harena) * viewWorldH * mul;
-      model.root.scale.setScalar(targetUnits);
-
-      // v3.167 DIAGNÓSTICO no aparelho: mede cabeça vs pés na tela após
-      // atualizar as matrizes. hY > fY = em pé; senão = deitado.
-      model.root.updateMatrixWorld(true);
-      try {
-        const _h = model.inner.getObjectByName('Head') || model.inner.getObjectByName('head');
-        const _f = model.inner.getObjectByName('LeftFoot') || model.inner.getObjectByName('RightFoot');
-        if (_h && _f) {
-          const hp = new THREE.Vector3(); _h.getWorldPosition(hp);
-          const fp = new THREE.Vector3(); _f.getWorldPosition(fp);
-          const hpw = hp.y, fpw = fp.y;     // altura no MUNDO (antes de projetar)
-          hp.project(camera); fp.project(camera);
-          window.__dbg3d.headfoot = 'mundoH:'+hpw.toFixed(2)+'/'+fpw.toFixed(2)+
-            ' telaY:'+hp.y.toFixed(2)+'/'+fp.y.toFixed(2)+(hp.y>fp.y?' EMPE':' DEIT');
-        } else {
-          window.__dbg3d.headfoot = 'sem ossos h='+(!!_h)+' f='+(!!_f);
-        }
-      } catch(_e) { window.__dbg3d.headfoot = 'errO'; }
-
-      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?');
-
-      window.__dbg3d.ok++;
-      return true;
-    } catch (err) {
-      window.__dbg3d.err = String(err).slice(0,80);
-      console.warn('[3d] update falhou, desativando 3D:', err);
-      api.available = false;
-      return false;
-    }
-  }
-
-  // v3.166: render UMA vez por frame (chamado pelo loop após renderArena).
-  function render3D() {
-    if (!renderer || !api.available || !api.enabled) return;
-    try {
-      // v3.176: câmera FIXA na posição da v3.113 (não sobrescreve por slider).
-      renderer.render(scene, camera);
-    } catch (err) {
-      console.warn('[3d] render falhou, desativando:', err);
-      api.available = false;
-    }
-  }
-
-  function preload() {
-    if (!api.enabled) return;
-    ensureInit();
-    Object.keys(HERO_3D_MODELS).forEach(loadModel);
-  }
-
-  return {
-    config: { HERO_3D_MODELS, ANIM_CLIP_MAP },
-    state: api, preload, loadModel, draw3DMage, render3D, resize3D,
-    get enabled() { return api.enabled; },
-    set enabled(v) { api.enabled = v; }
-  };
-})();
-
 const HERO_SPRITES = {
   AELAR: {
     idle:         'https://i.ibb.co/QFwVb8XW/IMG-7229.png',
@@ -11167,11 +10788,45 @@ function drawMageSpriteFromImage(e, charX, charY) {
 // v3.48: ARTE DOS MAGOS — silhueta vetorial desenhada diretamente no canvas.
 // Substitui o círculo+emoji por uma figura distintiva por mago.
 // Animações: idle bobbing, walk sway (sincronizado com joystick/movimento), cast flash.
+// v3.108: ponte entre o jogo 2D e o sistema 3D (Three.js)
+// Retorna true se o mago foi renderizado em 3D (e portanto o 2D deve ser pulado)
+let USE_3D_AELAR = true; // flag: usar 3D pro Aelar
+function mageHas3D(e) {
+  return USE_3D_AELAR && e.heroKey === 'AELAR' && window.Runecast3D && window.Runecast3D.ready && window.Runecast3D.enabled;
+}
+function registerMage3D(e, charX, charY) {
+  if (!mageHas3D(e)) return false;
+  const R3D = window.Runecast3D;
+  const id = (e === GAME.player) ? 'player' : 'bot';
+  // garante instância
+  if (!R3D.mages[id]) {
+    if (!R3D.spawnMage(id)) return false;
+  }
+  // estado da animação (reaproveita getEntitySpriteState)
+  let state = (typeof getEntitySpriteState === 'function') ? getEntitySpriteState(e) : 'idle';
+  // mapeia walking_back/side -> walking (3D rotaciona sozinho)
+  if (state === 'walking_back' || state === 'side') state = 'walking';
+  // ângulo de facing baseado na velocidade
+  let facingAngle = e._lastFacingAngle || 0;
+  const sp = Math.hypot(e.vx || 0, e.vy || 0);
+  if (sp > 0.3) {
+    // v3.113: facing — atan2 ajustado pra cima=costas, baixo=frente, e horizontais corretos
+    facingAngle = Math.atan2(-(e.vx || 0), -(e.vy || 0));
+    e._lastFacingAngle = facingAngle;
+  }
+  R3D.updateMage(id, {
+    x: charX, y: charY,
+    state: state,
+    vx: e.vx, vy: e.vy,
+    facingAngle: facingAngle,
+    height2D: PLAYER_RADIUS * 2.8   // v3.109b: altura visual do mago 2D pra casar escala
+  });
+  return true;
+}
+
 function drawMageSprite(e, charX, charY) {
-  // v3.109: tenta 3D primeiro (módulo isolado). Sem modelo p/ este herói ou
-  // 3D indisponível -> retorna false e seguimos com o pipeline 2D normal.
-  if (typeof RUNECAST_3D !== 'undefined' &&
-      RUNECAST_3D.draw3DMage(fxCtx, e, charX, charY, getEntitySpriteState)) return;
+  // v3.108: se o mago tem modelo 3D ativo, registra posição pro Three.js e PULA o 2D
+  if (registerMage3D(e, charX, charY)) return;
   // v3.105: tenta sprite imagem primeiro; se falhar, cai pro vetorial abaixo
   if (drawMageSpriteFromImage(e, charX, charY)) return;
   // Pega paleta do herói
@@ -12001,15 +11656,7 @@ function drawEntityBars(e, charX, charY) {
   const barH = 5;
   const gap = 2;
   // 18 = HP bar height + mana crystals row above the character
-  // v3.125: se a entidade usa modelo 3D (mais alto que o sprite 2D), sobe a
-  // barra para ficar acima da cabeça do mago 3D, não no meio do corpo.
-  let extraUp = 0;
-  if (typeof RUNECAST_3D !== 'undefined' && RUNECAST_3D.config &&
-      RUNECAST_3D.config.HERO_3D_MODELS[e.heroKey] &&
-      RUNECAST_3D.state.available) {
-    extraUp = 45; // sobe a barra para acima da cabeça do mago 3D
-  }
-  const offsetY = -(PLAYER_RADIUS + 18 + extraUp);
+  const offsetY = -(PLAYER_RADIUS + 18);
   const barX = charX - barW / 2;
   const barY = charY + offsetY;
   
@@ -12644,6 +12291,12 @@ function startMatch(diff) {
   GAME.bot = createEntity(worldSize.w * 0.5, worldSize.h * 0.15, botHero.color, botHero.emoji, true, botHeroKey);
   GAME.player.heroKey = GAME.selectedHero;
   GAME.bot.heroKey = botHeroKey;
+  // v3.108: ativa camada 3D e limpa magos antigos
+  if (window.Runecast3D && window.Runecast3D.ready) {
+    window.Runecast3D.clearMages();
+    window.Runecast3D.setEnabled(true);
+    window.Runecast3D.resize();
+  }
   // v3.14: bot usa o loadout padrão do mago dele
   GAME.bot.loadout = { ...DEFAULT_LOADOUT[botHeroKey] };
   GAME.player.loadout = { ...GAME.playerLoadout };
@@ -12694,6 +12347,11 @@ function startMatch(diff) {
 
 function backToMenu() {
   GAME.running = false;
+  // v3.108: desativa camada 3D
+  if (window.Runecast3D) {
+    window.Runecast3D.setEnabled(false);
+    window.Runecast3D.clearMages();
+  }
   resetInputState();
   // v3.61: se estava em tutorial, limpa estado e overlay
   if (GAME.tutorialMode) {
@@ -13754,81 +13412,324 @@ window.addEventListener('load', () => {
 
 // v3.105: pré-carrega sprites de IA dos magos
 preloadAllSprites();
+</script>
+<script>
 
-// v3.110: pré-carrega o modelo 3D APÓS o Three.js (carregado via defer) chegar.
-// Como os scripts da CDN têm 'defer', eles só executam depois deste script
-// inline. Por isso esperamos o evento 'load' e checamos window.THREE.
-// Se a CDN falhar (sem THREE), o módulo nunca ativa e o jogo segue em 2D.
-window.addEventListener('load', () => {
-  // pequeno atraso extra para garantir que os scripts defer executaram
-  setTimeout(() => {
-    if (typeof RUNECAST_3D !== 'undefined' && window.THREE) {
-      try { RUNECAST_3D.preload(); }
-      catch (e) { console.warn('[3d] preload falhou', e); }
-    } else {
-      console.log('[3d] Three.js não disponível — jogo seguindo em 2D');
-    }
-  }, 200);
-});
+</script>
 
-// v3.162: painel de CALIBRAÇÃO do mago 3D — sliders ao vivo. Ajuste e me passe
-// os valores. Toque em "ESCONDER" para ocultar.
-window.addEventListener('load', () => {
-  window.__calib3d = window.__calib3d || { mul: 0.5 };
+<script type="module">
+// =====================================================================
+// v3.108: SISTEMA 3D — Three.js renderiza os magos como modelos 3D animados
+// Expõe window.Runecast3D com a API usada pelo jogo 2D.
+// =====================================================================
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 
-  const panel = document.createElement('div');
-  panel.style.cssText = 'position:fixed;bottom:env(safe-area-inset-bottom,8px);left:4px;right:4px;z-index:2147483647;background:rgba(0,0,0,.9);color:#0f0;font:12px monospace;padding:10px 12px;border-radius:10px;line-height:1.6;pointer-events:auto;border:1px solid #0f06';
-  // impede que toques no painel virem gestos de desenho na arena
-  ['touchstart','touchmove','touchend','pointerdown','pointermove','mousedown'].forEach(ev => {
-    panel.addEventListener(ev, e => e.stopPropagation(), { passive: false, capture: true });
-  });
+const R3D = {
+  ready: false,
+  scene: null,
+  camera: null,
+  renderer: null,
+  clock: null,
+  baseModel: null,      // GLB carregado (template)
+  baseAnimations: null, // animações do GLB
+  mages: {},            // id -> { root, mixer, actions, currentAction }
+  enabled: false,       // só renderiza durante partida
+};
 
-  function makeSlider(label, key, min, max, step, val) {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;margin:4px 0';
-    const lab = document.createElement('span');
-    lab.style.cssText = 'min-width:95px;color:#9f9';
-    const sld = document.createElement('input');
-    sld.type = 'range'; sld.min = min; sld.max = max; sld.step = step; sld.value = val;
-    sld.style.cssText = 'flex:1;touch-action:none;height:28px';
-    ['touchstart','touchmove','touchend','pointerdown','pointermove'].forEach(ev => {
-      sld.addEventListener(ev, e => e.stopPropagation(), { passive: true, capture: true });
+// Converte base64 -> ArrayBuffer
+function b64ToArrayBuffer(b64) {
+  const bin = atob(b64);
+  const len = bin.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// Mapeia estado do jogo -> nome da animação no GLB
+const ANIM_MAP = {
+  idle:         'Walking',          // não tem idle puro; usaremos Walking pausado/lento como fallback
+  walking:      'Walking',
+  walking_back: 'Walking',
+  side:         'Walking',
+  running:      'Running',
+  cast:         'Charged_Spell_Cast',
+  hit:          'Hit_Reaction_to_Waist',
+  death:        'Dead',
+};
+
+R3D.init = function() {
+  if (R3D.scene) return;
+  const canvas = document.getElementById('three-canvas');
+  if (!canvas) { console.warn('[3D] canvas não encontrado'); return; }
+
+  R3D.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, depth: true, stencil: false });
+  R3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  R3D.renderer.outputColorSpace = THREE.SRGBColorSpace;
+  R3D.renderer.sortObjects = true;
+
+  R3D.scene = new THREE.Scene();
+
+  // v3.111: câmera inclinada estilo Brawl Stars/MOBA (vê o personagem de frente-cima)
+  R3D.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+  R3D.camera.position.set(0, 11, 9);
+  R3D.camera.lookAt(0, 1.2, 0);
+
+  // Luzes
+  const ambient = new THREE.AmbientLight(0xffffff, 1.4);
+  R3D.scene.add(ambient);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.6);
+  dir.position.set(3, 10, 6);
+  R3D.scene.add(dir);
+  // Luz de preenchimento fria (atmosfera mágica)
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.5);
+  fill.position.set(-4, 3, -3);
+  R3D.scene.add(fill);
+
+  R3D.clock = new THREE.Clock();
+
+  // CONVERSÃO: carrega o GLB de URL externa (em vez do base64 embutido).
+  // Esta é a ÚNICA mudança em relação à v3.113 original que funcionava.
+  const loader = new GLTFLoader();
+  try {
+    loader.load('aelar_3d.glb', (gltf) => {
+      R3D.baseModel = gltf.scene;
+      R3D.baseAnimations = gltf.animations;
+      // v3.113: corrige transparência — força materiais opacos com depth test/write
+      R3D.baseModel.traverse((obj) => {
+        if (obj.isMesh && obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((mat) => {
+            mat.transparent = false;
+            mat.depthWrite = true;
+            mat.depthTest = true;
+            mat.alphaTest = 0.5;   // recorta bordas semi-transparentes
+            mat.side = THREE.FrontSide;
+            mat.needsUpdate = true;
+          });
+          obj.castShadow = false;
+          obj.receiveShadow = false;
+          obj.frustumCulled = false;
+        }
+      });
+      R3D.ready = true;
+      console.log('[3D] Aelar carregado (URL externa).', gltf.animations.length, 'animações');
+    }, undefined, (err) => {
+      console.error('[3D] erro ao carregar GLB da URL:', err);
     });
-    const out = document.createElement('span');
-    out.style.cssText = 'min-width:48px;text-align:right;color:#fff';
-    const upd = () => {
-      lab.textContent = label;
-      out.textContent = parseFloat(sld.value).toFixed(2);
-      window.__calib3d[key] = parseFloat(sld.value);
-    };
-    sld.addEventListener('input', upd); upd();
-    row.appendChild(lab); row.appendChild(sld); row.appendChild(out);
-    return row;
+  } catch (e) {
+    console.error('[3D] erro no load:', e);
   }
 
-  const title = document.createElement('div');
-  title.textContent = 'CALIBRAR MAGO 3D';
-  title.style.cssText = 'color:#fff;font-weight:bold;margin-bottom:4px';
-  panel.appendChild(title);
-  panel.appendChild(makeSlider('Escala 3D', 'mul', 0.1, 2, 0.05, window.__calib3d.mul || 0.5));
+  R3D.resize();
+  window.addEventListener('resize', R3D.resize);
+};
 
-  const hint = document.createElement('div');
-  hint.style.cssText = 'color:#888;font-size:10px;margin-top:6px';
-  hint.textContent = 'Ajuste e me passe os 2 valores. Toque aqui para esconder.';
-  hint.onclick = () => panel.style.display = 'none';
-  panel.appendChild(hint);
+// Ajusta o renderer ao tamanho da arena
+R3D.resize = function() {
+  if (!R3D.renderer) return;
+  const arena = document.getElementById('arena-area');
+  const rect = arena ? arena.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight };
+  const w = rect.width, h = rect.height;
+  // v3.111c: usa setSize COM ajuste de style (true) pra casar exatamente com o arena-canvas em CSS px
+  R3D.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  R3D.renderer.setSize(w, h, true);
+  // força o canvas a cobrir o arena-area por CSS
+  const c = document.getElementById('three-canvas');
+  if (c) {
+    c.style.width = w + 'px';
+    c.style.height = h + 'px';
+    c.style.top = '0px';
+    c.style.left = '0px';
+  }
+  R3D._w = w; R3D._h = h;
+  const aspect = w / h;
+  const viewH = 8;
+  R3D.camera.left = -viewH * aspect / 2;
+  R3D.camera.right = viewH * aspect / 2;
+  R3D.camera.top = viewH / 2;
+  R3D.camera.bottom = -viewH / 2;
+  R3D.camera.updateProjectionMatrix();
+};
 
-  // v3.173: linha de diagnóstico AO VIVO — mostra os valores reais do 3D.
-  const diag = document.createElement('div');
-  diag.style.cssText = 'color:#0ff;font-size:11px;margin-top:6px;word-break:break-all';
-  panel.appendChild(diag);
-  setInterval(() => {
-    const d = window.__dbg3d || {};
-    diag.textContent = 'DIAG: ' + (d.ret || '(sem dados — 3D nao chamado)');
-  }, 300);
+// Cria uma instância 3D do mago pra um id (player/bot)
+R3D.spawnMage = function(id) {
+  if (!R3D.ready || !R3D.baseModel) return false;
+  if (R3D.mages[id]) return true; // já existe
+  // Clona o modelo (SkeletonUtils preserva o rig pra SkinnedMesh)
+  const model = skeletonClone(R3D.baseModel);
+  const mixer = new THREE.AnimationMixer(model);
+  const actions = {};
+  for (const clip of R3D.baseAnimations) {
+    actions[clip.name] = mixer.clipAction(clip);
+  }
 
-  document.body.appendChild(panel);
-});
+  // v3.109b: NORMALIZA o modelo pra altura 1.0 unidade (base).
+  // O tamanho real na cena é aplicado depois, proporcional ao mago 2D.
+  const box = new THREE.Box3().setFromObject(model);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  const modelHeight = size.y || 1;
+  const normScale = 1.0 / modelHeight; // normaliza pra altura = 1 unidade
+
+  // Container "pivot": centraliza o modelo nos pés, na origem
+  const pivot = new THREE.Group();
+  model.position.x = -center.x * normScale;
+  model.position.z = -center.z * normScale;
+  model.position.y = -box.min.y * normScale; // pés no chão
+  model.scale.setScalar(normScale);
+  pivot.add(model);
+
+  R3D.scene.add(pivot);
+  R3D.mages[id] = { root: pivot, model, mixer, actions, currentAction: null, currentState: null, normScale };
+  console.log('[3D] mago', id, 'altura original', modelHeight.toFixed(2), 'normScale', normScale.toFixed(4));
+  return true;
+};
+
+R3D.removeMage = function(id) {
+  const m = R3D.mages[id];
+  if (!m) return;
+  R3D.scene.remove(m.root);
+  delete R3D.mages[id];
+};
+
+R3D.clearMages = function() {
+  for (const id of Object.keys(R3D.mages)) R3D.removeMage(id);
+};
+
+// Toca uma animação (com crossfade)
+function playAction(m, animName, loop = true) {
+  const action = m.actions[animName];
+  if (!action) return;
+  if (m.currentAction === action) return;
+  action.reset();
+  action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+  action.clampWhenFinished = !loop;
+  action.fadeIn(0.15);
+  action.play();
+  if (m.currentAction) m.currentAction.fadeOut(0.15);
+  m.currentAction = action;
+}
+
+// Atualiza posição/rotação/animação de um mago.
+// gameState: { x, y (em px do canvas da arena), state, vx, vy, facingAngle }
+R3D.updateMage = function(id, gs) {
+  const m = R3D.mages[id];
+  if (!m) return;
+
+  // v3.111b: posiciona via UNPROJECT — converte pixel da tela pro ponto no plano do chão (y=0).
+  // Funciona com QUALQUER ângulo de câmera (inclinada inclusive).
+  const w = R3D._w || 1, h = R3D._h || 1;
+  // normaliza pixel -> NDC (-1..1), y invertido
+  const ndcX = ((gs.x + (R3D.offX||0)) / w) * 2 - 1;
+  const ndcY = -(((gs.y + (R3D.offY||0)) / h) * 2 - 1);
+  // raycaster a partir da câmera no ponto da tela
+  if (!R3D._ray) R3D._ray = new THREE.Raycaster();
+  if (!R3D._planeY0) R3D._planeY0 = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+  R3D._ray.setFromCamera({ x: ndcX, y: ndcY }, R3D.camera);
+  const hit = new THREE.Vector3();
+  R3D._ray.ray.intersectPlane(R3D._planeY0, hit);
+  if (hit) {
+    m.root.position.set(hit.x, 0, hit.z);
+  }
+
+  // Escala fixada (slider calibrou)
+  const mage2DHeightPx = (gs.height2D || 67);
+  const mul = (R3D.scaleMul !== undefined ? R3D.scaleMul : 0.357);
+  // referência: altura desejada em px -> fração da tela -> unidades de mundo no plano
+  // usamos a altura visível do frustum no plano do chão
+  const viewWorldH = (R3D.camera.top - R3D.camera.bottom);
+  const targetUnits = (mage2DHeightPx / h) * viewWorldH * mul;
+  m.root.scale.setScalar(targetUnits);
+
+  // Rotação: vira pra direção do movimento
+  if (gs.facingAngle !== undefined && gs.facingAngle !== null) {
+    m.root.rotation.y = gs.facingAngle;
+  }
+
+  // Animação por estado
+  const animName = ANIM_MAP[gs.state] || 'Walking';
+  const loop = (gs.state !== 'death' && gs.state !== 'cast' && gs.state !== 'hit');
+  if (m.currentState !== gs.state) {
+    playAction(m, animName, loop);
+    m.currentState = gs.state;
+    if (gs.state === 'idle' && m.actions['Walking']) {
+      m.actions['Walking'].timeScale = 0.0;
+    } else if (m.actions[animName]) {
+      m.actions[animName].timeScale = 1.0;
+    }
+  }
+};
+
+// Renderiza um frame (chamado pelo loop do jogo)
+R3D.render = function() {
+  if (!R3D.ready || !R3D.renderer) return;
+  try {
+    const dt = Math.min(R3D.clock.getDelta(), 0.1);
+    for (const id in R3D.mages) {
+      R3D.mages[id].mixer.update(dt);
+    }
+    R3D.renderer.render(R3D.scene, R3D.camera);
+  } catch (e) {
+    console.error('[3D] erro no render, desativando 3D:', e);
+    R3D.enabled = false;
+  }
+};
+
+R3D.setEnabled = function(on) {
+  R3D.enabled = on;
+  const canvas = document.getElementById('three-canvas');
+  if (canvas) canvas.style.display = on ? 'block' : 'none';
+  const dbg = document.getElementById('scale3d-debug');
+  if (dbg) dbg.style.display = on ? 'flex' : 'none';
+};
+
+window.Runecast3D = R3D;
+R3D.scaleMul = 0.5;
+
+// v3.110: slider de calibração de escala
+(function() {
+  const slider = document.getElementById('scale3d-slider');
+  const val = document.getElementById('scale3d-val');
+  const dbg = document.getElementById('scale3d-debug');
+  if (slider) {
+    slider.style.touchAction = 'none';
+    slider.addEventListener('input', () => {
+      R3D.scaleMul = parseFloat(slider.value);
+      if (val) val.textContent = R3D.scaleMul.toFixed(2);
+    });
+    ['touchstart','touchmove','touchend','pointerdown','pointermove','mousedown'].forEach(ev => {
+      slider.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+    });
+  }
+  // sliders de offset X/Y
+  R3D.offX = 0; R3D.offY = 0;
+  const offxS = document.getElementById('offx3d-slider');
+  const offxV = document.getElementById('offx3d-val');
+  const offyS = document.getElementById('offy3d-slider');
+  const offyV = document.getElementById('offy3d-val');
+  [offxS, offyS].forEach(s => {
+    if (!s) return;
+    s.style.touchAction = 'none';
+    ['touchstart','touchmove','touchend','pointerdown','pointermove','mousedown'].forEach(ev => {
+      s.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+    });
+  });
+  if (offxS) offxS.addEventListener('input', () => { R3D.offX = parseFloat(offxS.value); if(offxV) offxV.textContent = R3D.offX; });
+  if (offyS) offyS.addEventListener('input', () => { R3D.offY = parseFloat(offyS.value); if(offyV) offyV.textContent = R3D.offY; });
+  if (dbg) {
+    ['touchstart','touchmove','touchend','pointerdown','mousedown'].forEach(ev => {
+      dbg.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+    });
+  }
+})();
+
+// Auto-init quando o módulo carrega
+R3D.init();
 </script>
+
 </body>
 </html>
