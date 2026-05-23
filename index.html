@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.210 — idle parado + cast visivel</title>
+<title>Runecast v3.211 — diag cast</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13733,6 +13733,8 @@ R3D.updateMage = function(id, gs) {
   window.__anim3d = window.__anim3d || {};
   window.__anim3d[id] = m.heroKey + ': estado=' + gs.state + ' anim=' + animName +
     ' existe=' + (!!m.actions[animName]);
+  // v3.211: marca quando cast foi visto (pra confirmar se o estado chega)
+  if (gs.state === 'cast') { window.__castSeen = window.__castSeen || {}; window.__castSeen[id] = Date.now(); }
   // v3.210: cast agora em LOOP — animações de cast curtas (ex: Axe_Spin 0.63s)
   // tocavam uma vez e congelavam, ficando quase invisíveis. Em loop, o gesto se
   // repete durante todo o lançamento. Só death/hit tocam uma vez.
@@ -13784,7 +13786,10 @@ window.addEventListener('load', () => {
   document.body.appendChild(ov);
   setInterval(() => {
     const a = window.__anim3d || {};
-    ov.textContent = 'ANIM 3D\n' + (a.player ? 'P ' + a.player : 'P -') + '\n' + (a.bot ? 'B ' + a.bot : 'B -');
+    const cs = window.__castSeen || {};
+    const now = Date.now();
+    const castP = cs.player ? ((now - cs.player) < 1500 ? 'CAST!' : 'há ' + Math.floor((now-cs.player)/1000) + 's') : 'nunca';
+    ov.textContent = 'ANIM 3D\n' + (a.player ? 'P ' + a.player : 'P -') + '\n' + (a.bot ? 'B ' + a.bot : 'B -') + '\ncast player: ' + castP;
   }, 200);
 });
 
