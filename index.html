@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.170 — modelo aelar_3d.glb (da v3.113)</title>
+<title>Runecast v3.171 — atan2 frontal (costas ao subir)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10978,9 +10978,9 @@ const RUNECAST_3D = (function () {
       const vy = e.vy || 0;
       const sp = Math.hypot(vx, vy);
       if (sp > 0.3) {
-        // v3.167: atan2 EXATO da v3.113 que funcionava — atan2(-vx, -vy). Meu
-        // "conserto" de eixo (v3.153, atan2(vx,vy)) pode ter sido o que quebrou.
-        model._facingAngle = Math.atan2(-(vx), -(vy));
+        // v3.171: com câmera FRONTAL (olha -Z, frente do modelo em +Z), para
+        // subir (vy<0) mostrar COSTAS (PI): atan2(vx, vy). descer->0 (frente).
+        model._facingAngle = Math.atan2(vx, vy);
       }
       if (model.root && model._facingAngle !== undefined) {
         // v3.165: gira o ROOT (pivot), exatamente como a v3.113. O inner está
