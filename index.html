@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.171 — atan2 frontal (costas ao subir)</title>
+<title>Runecast v3.172 — diag rotacao do root</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10988,7 +10988,8 @@ const RUNECAST_3D = (function () {
         // vertical, em pé — sem deitar nem orbitar.
         model.root.rotation.set(0, model._facingAngle, 0);
       }
-      window.__dbg3d.faseLabel = 'rotY='+(model.inner?model.inner.rotation.y.toFixed(2):'?')+' ang='+(model._facingAngle||0).toFixed(2)+' vy='+vy.toFixed(0);
+      window.__dbg3d.faseLabel = 'rootRotY='+(model.root?model.root.rotation.y.toFixed(2):'?')+
+        ' ang='+(model._facingAngle||0).toFixed(2)+' vx='+vx.toFixed(0)+' vy='+vy.toFixed(0)+' sp='+sp.toFixed(1);
 
       // fallback procedural (caso modelo não tenha mixer)
       if (!model.mixer) {
@@ -11046,8 +11047,7 @@ const RUNECAST_3D = (function () {
         }
       } catch(_e) { window.__dbg3d.headfoot = 'errO'; }
 
-      window.__dbg3d.ret = 'ang='+(model._facingAngle||0).toFixed(2)+
-        ' | '+(window.__dbg3d.headfoot||'?');
+      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?');
 
       window.__dbg3d.ok++;
       return true;
