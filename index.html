@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.165 — gira root (replica v3.113)</title>
+<title>Runecast v3.166 — arquitetura v3.113 (canvas unico + unproject)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -1759,7 +1759,7 @@
   }
   /* v3.28: canvases de gameplay (canto superior esq, sobreposição). 
      Canvases de modais (#gp-canvas, #cm-canvas) NÃO são abrangidos. */
-  #arena-canvas, #fx-canvas, #glyph-canvas, #draw-canvas,
+  #arena-canvas, #fx-canvas, #glyph-canvas, #draw-canvas, #three-canvas,
   #ultimate-charge-canvas, #rune-btn-ult-charge, .lb-ult-charge {
     position: absolute; top: 0; left: 0; touch-action: none; pointer-events: none;
   }
@@ -3629,6 +3629,7 @@
     </svg>
     
     <canvas id="arena-canvas"></canvas>
+    <canvas id="three-canvas"></canvas>
     <canvas id="fx-canvas"></canvas>
     
     <!-- Joystick zone (metade esquerda) -->
@@ -9371,6 +9372,9 @@ function _gameTickImpl(now) {
   }
   
   renderArena();
+  // v3.166: renderiza a cena 3D uma vez por frame (após posicionar os magos no
+  // renderArena). Arquitetura v3.113: canvas único sobre a arena.
+  if (typeof RUNECAST_3D !== 'undefined' && RUNECAST_3D.render3D) RUNECAST_3D.render3D();
   updateRuneButtons();
   
   requestAnimationFrame(gameTick);
@@ -10721,40 +10725,65 @@ const RUNECAST_3D = (function () {
     try {
       THREE = window.THREE;
       if (!THREE || !THREE.WebGLRenderer) { initFailed = true; return false; }
-      glCanvas = document.createElement('canvas');
-      glCanvas.width = RENDER_W; glCanvas.height = RENDER_H;
+      // v3.166: ARQUITETURA v3.113 — renderiza num canvas VISÍVEL sobre a arena
+      // (three-canvas), não num mini-canvas isolado. Cena única, câmera
+      // ortográfica inclinada, mago posicionado no chão do mundo via unproject.
+      glCanvas = document.getElementById('three-canvas');
+      if (!glCanvas) { console.warn('[3d] three-canvas ausente'); initFailed = true; return false; }
       renderer = new THREE.WebGLRenderer({
-        canvas: glCanvas, alpha: true, antialias: true,
-        preserveDrawingBuffer: true
+        canvas: glCanvas, alpha: true, antialias: true
       });
-      renderer.setPixelRatio(1);
-      renderer.setSize(RENDER_W, RENDER_H, false);
-      renderer.setClearColor(0x000000, 0); // fundo 100% transparente
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setClearColor(0x000000, 0); // transparente
       if (THREE.sRGBEncoding !== undefined) renderer.outputEncoding = THREE.sRGBEncoding;
       scene = new THREE.Scene();
-      // v3.160: ARQUITETURA DA v3.113 (que funcionava). Frustum em UNIDADES DE
-      // MUNDO (8 un de altura) cobrindo a área. O mago é normalizado para ~1
-      // unidade e fica pequeno na cena — por isso aparece em pé e coerente, sem
-      // o escorço que o deitava. Base para a arena 3D futura.
-      const viewH = 8;
-      const aspect = RENDER_W / RENDER_H;
-      camera = new THREE.OrthographicCamera(
-        -viewH * aspect / 2, viewH * aspect / 2, viewH / 2, -viewH / 2, 0.1, 1000);
-      camera.position.set(0, 11, 9);   // inclinada estilo MOBA (v3.113)
-      camera.lookAt(0, 0.43, 0);       // mira o centro real do mago (medido)
+      // câmera ortográfica inclinada (v3.113). Frustum dimensionado em unidades
+      // de mundo no resize(). Posição/ângulo idênticos à versão que funcionava.
+      camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+      camera.position.set(0, 11, 9);
+      camera.lookAt(0, 1.2, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 1.4));
       const dir = new THREE.DirectionalLight(0xffffff, 1.6);
       dir.position.set(3, 10, 6); scene.add(dir);
       const fill = new THREE.DirectionalLight(0x88aaff, 0.5);
       fill.position.set(-4, 3, -3); scene.add(fill);
       clock = new THREE.Clock();
+      api._ray = new THREE.Raycaster();
+      api._planeY0 = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+      resize3D();
+      window.addEventListener('resize', resize3D);
       api.available = true;
-      console.log('[3d] WebGL pronto');
+      console.log('[3d] WebGL pronto (three-canvas, arquitetura v3.113)');
       return true;
     } catch (err) {
       console.warn('[3d] init falhou, usando sprites 2D:', err);
       initFailed = true; api.available = false; return false;
     }
+  }
+
+  // v3.166: ajusta o renderer e o frustum ao tamanho da arena (unidades mundo).
+  function resize3D() {
+    if (!renderer) return;
+    const arena = document.getElementById('arena-area');
+    const rect = arena ? arena.getBoundingClientRect()
+                       : { width: window.innerWidth, height: window.innerHeight };
+    const w = rect.width, h = rect.height;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(w, h, true);
+    if (glCanvas) {
+      glCanvas.style.width = w + 'px';
+      glCanvas.style.height = h + 'px';
+      glCanvas.style.top = '0px';
+      glCanvas.style.left = '0px';
+    }
+    api._w = w; api._h = h;
+    const aspect = w / h;
+    const viewH = (window.__calib3d && window.__calib3d.viewH) || 8;
+    camera.left = -viewH * aspect / 2;
+    camera.right = viewH * aspect / 2;
+    camera.top = viewH / 2;
+    camera.bottom = -viewH / 2;
+    camera.updateProjectionMatrix();
   }
 
   // ---- CARREGAMENTO -------------------------------------------------
@@ -10971,58 +11000,48 @@ const RUNECAST_3D = (function () {
           : Math.sin(now/350) * 0.05;
       }
 
-      // garante só este root visível na cena compartilhada
-      if (scene.children.indexOf(model.root) === -1) {
-        for (const k in api.models) {
-          const m = api.models[k];
-          if (m && m.root && scene.children.indexOf(m.root) !== -1) scene.remove(m.root);
-        }
-        scene.add(model.root);
+      // garante só os magos ativos visíveis na cena compartilhada
+      if (scene.children.indexOf(model.root) === -1) scene.add(model.root);
+      model.root.visible = true;
+
+      // v3.166: POSICIONA o mago no chão do mundo 3D via UNPROJECT (igual à
+      // v3.113). charX/charY são pixels na arena; convertendo para o plano y=0
+      // o mago fica exatamente onde está no jogo, e a câmera inclinada o vê em
+      // pé e coerente com a cena. NÃO copiamos imagem — o canvas já está sobre
+      // a arena.
+      const W = api._w || 1, H = api._h || 1;
+      const ndcX = (charX / W) * 2 - 1;
+      const ndcY = -((charY / H) * 2 - 1);
+      api._ray.setFromCamera({ x: ndcX, y: ndcY }, camera);
+      const hit = new THREE.Vector3();
+      if (api._ray.ray.intersectPlane(api._planeY0, hit)) {
+        model.root.position.set(hit.x, 0, hit.z);
       }
-      for (const k in api.models) {
-        const m = api.models[k];
-        if (m && m.root) m.root.visible = (m === model);
-      }
+      // escala ajustável ao vivo (altura do mago em unidades de mundo)
+      const NATIVE_H = 2.56;
+      const worldH = (window.__calib3d && window.__calib3d.worldH) || 2.2;
+      model.root.scale.setScalar(worldH / NATIVE_H);
+      window.__dbg3d.ret = 'ang='+(model._facingAngle||0).toFixed(2)+' pos='+
+        (hit?hit.x.toFixed(1)+','+hit.z.toFixed(1):'?')+' wH='+worldH.toFixed(1);
 
-      // v3.154: câmera ortográfica fixa (definida na init, alta e inclinada).
-      // NÃO reposicionamos por frame — é o que mostra as costas ao girar.
-
-      renderer.render(scene, camera);
-
-      // v3.159 DIAGNÓSTICO: mede onde a CABEÇA e os PÉS do mago aparecem na
-      // tela (NDC y: +1 topo, -1 base). Se cabeça > pés = em pé; se ~iguais ou
-      // invertido = deitado. Roda no aparelho real para revelar o que acontece.
-      try {
-        const _head = model.inner.getObjectByName('Head') || model.inner.getObjectByName('head');
-        const _foot = model.inner.getObjectByName('LeftFoot') || model.inner.getObjectByName('RightFoot');
-        if (_head && _foot) {
-          const _hp = new THREE.Vector3(); _head.getWorldPosition(_hp); _hp.project(camera);
-          const _fp = new THREE.Vector3(); _foot.getWorldPosition(_fp); _fp.project(camera);
-          window.__dbg3d.headfoot = 'hY='+_hp.y.toFixed(2)+' fY='+_fp.y.toFixed(2)+(_hp.y > _fp.y+0.1 ? ' EMPE' : ' DEITADO');
-        } else {
-          window.__dbg3d.headfoot = 'ossos? h='+(!!_head)+' f='+(!!_foot);
-        }
-      } catch(_e) { window.__dbg3d.headfoot = 'erro:'+String(_e).slice(0,20); }
-
-      // v3.120 diagnóstico: registra posições para o painel
-      window.__dbg3d.cam = camera.position.x.toFixed(1)+','+camera.position.y.toFixed(1)+','+camera.position.z.toFixed(1);
-      const wp = new THREE.Vector3(); model.root.getWorldPosition(wp);
-      window.__dbg3d.mdl = wp.x.toFixed(1)+','+wp.y.toFixed(1)+','+wp.z.toFixed(1);
-      window.__dbg3d.vis = model.root.visible;
-      window.__dbg3d.sc = model.root.scale.x.toFixed(3);
-      window.__dbg3d.ret = (window.__dbg3d.faseLabel||'?')+' | '+(window.__dbg3d.headfoot||'?');
-
-      const drawH = (window.__calib3d && window.__calib3d.targetH) || TARGET_H;
-      const drawW = drawH * (RENDER_W / RENDER_H);
-      const FOOT_OFFSET = (window.__calib3d && window.__calib3d.footOffset) || 0.62;
-      ctx.drawImage(glCanvas, charX - drawW/2, charY - drawH * FOOT_OFFSET, drawW, drawH);
       window.__dbg3d.ok++;
       return true;
     } catch (err) {
       window.__dbg3d.err = String(err).slice(0,80);
-      console.warn('[3d] draw falhou, desativando 3D:', err);
+      console.warn('[3d] update falhou, desativando 3D:', err);
       api.available = false;
       return false;
+    }
+  }
+
+  // v3.166: render UMA vez por frame (chamado pelo loop após renderArena).
+  function render3D() {
+    if (!renderer || !api.available || !api.enabled) return;
+    try {
+      renderer.render(scene, camera);
+    } catch (err) {
+      console.warn('[3d] render falhou, desativando:', err);
+      api.available = false;
     }
   }
 
@@ -11034,7 +11053,7 @@ const RUNECAST_3D = (function () {
 
   return {
     config: { HERO_3D_MODELS, ANIM_CLIP_MAP },
-    state: api, preload, loadModel, draw3DMage,
+    state: api, preload, loadModel, draw3DMage, render3D, resize3D,
     get enabled() { return api.enabled; },
     set enabled(v) { api.enabled = v; }
   };
