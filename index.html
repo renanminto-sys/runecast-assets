@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.173 — diag ao vivo no painel</title>
+<title>Runecast v3.174 — angulo moderado + sliders novos</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10740,10 +10740,10 @@ const RUNECAST_3D = (function () {
       // câmera ortográfica inclinada (v3.113). Frustum dimensionado em unidades
       // de mundo no resize(). Posição/ângulo idênticos à versão que funcionava.
       camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-      // v3.169: câmera QUASE FRONTAL (leve ângulo de cima, ~12°). A câmera muito
-      // inclinada (47°) fazia o mago "andar na parede" porque a arena 2D é vista
-      // de frente, não de cima. Quase frontal casa com o plano da arena.
-      camera.position.set(0, 1.2, 5);
+      // v3.174: ângulo de cima MODERADO (~30°). Frontal puro (v3.169) deixava
+      // frente/costas ambíguas neste modelo; 47° deitava. 30° distingue as
+      // costas (vê topo da cabeça ao virar) sem deitar nem andar na parede.
+      camera.position.set(0, 3, 5);
       camera.lookAt(0, 1.0, 0);
       scene.add(new THREE.AmbientLight(0xffffff, 1.4));
       const dir = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -11063,6 +11063,12 @@ const RUNECAST_3D = (function () {
   function render3D() {
     if (!renderer || !api.available || !api.enabled) return;
     try {
+      // v3.174: ângulo da câmera ajustável ao vivo (slider camY)
+      if (window.__calib3d && window.__calib3d.camY && camera) {
+        camera.position.set(0, window.__calib3d.camY, 5);
+        camera.lookAt(0, 1.0, 0);
+        camera.updateProjectionMatrix();
+      }
       renderer.render(scene, camera);
     } catch (err) {
       console.warn('[3d] render falhou, desativando:', err);
@@ -13822,7 +13828,7 @@ window.addEventListener('load', () => {
 // v3.162: painel de CALIBRAÇÃO do mago 3D — sliders ao vivo. Ajuste e me passe
 // os valores. Toque em "ESCONDER" para ocultar.
 window.addEventListener('load', () => {
-  window.__calib3d = window.__calib3d || { targetH: 130, footOffset: 0.62, worldH: 2.2 };
+  window.__calib3d = window.__calib3d || { worldH: 2.0, camY: 3 };
 
   const panel = document.createElement('div');
   panel.style.cssText = 'position:fixed;bottom:env(safe-area-inset-bottom,8px);left:4px;right:4px;z-index:2147483647;background:rgba(0,0,0,.9);color:#0f0;font:12px monospace;padding:10px 12px;border-radius:10px;line-height:1.6;pointer-events:auto;border:1px solid #0f06';
@@ -13858,8 +13864,8 @@ window.addEventListener('load', () => {
   title.textContent = 'CALIBRAR MAGO 3D';
   title.style.cssText = 'color:#fff;font-weight:bold;margin-bottom:4px';
   panel.appendChild(title);
-  panel.appendChild(makeSlider('Tamanho (px)', 'targetH', 60, 400, 5, window.__calib3d.targetH));
-  panel.appendChild(makeSlider('Altura/posição', 'footOffset', 0.2, 1.2, 0.02, window.__calib3d.footOffset));
+  panel.appendChild(makeSlider('Tamanho 3D', 'worldH', 0.5, 5, 0.1, window.__calib3d.worldH || 2.0));
+  panel.appendChild(makeSlider('Câmera altura', 'camY', 0.5, 11, 0.5, window.__calib3d.camY || 3));
 
   const hint = document.createElement('div');
   hint.style.cssText = 'color:#888;font-size:10px;margin-top:6px';
