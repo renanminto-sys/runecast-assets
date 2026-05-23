@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.224 — drax idle Running 50%</title>
+<title>Runecast v3.225 — sombra realinhada</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -11147,14 +11147,14 @@ function drawEntity(e) {
   const charY = ground.y - STAND_HEIGHT;
   
   // Sombra (elipse achatada no chão)
-  // v3.221: para magos 3D, a sombra fica mais embaixo (alinhada aos pés 3D, que
-  // pela câmera inclinada aparecem mais baixo) e mais sutil — evita a sensação de
-  // "voando" com a sombra descolada, sobretudo quando o mago está de costas.
+  // v3.225: sombra na MESMA base lógica do mago (ground.y+2), igual ao 2D — o
+  // deslocamento +10 da v3.221 desalinhava. Só fica um pouco mais sutil/menor
+  // para os magos 3D, sem mover do lugar.
   const is3DMage = (typeof mageHas3D === 'function') && mageHas3D(e);
   if (is3DMage) {
-    arenaCtx.fillStyle = 'rgba(0,0,0,0.35)';
+    arenaCtx.fillStyle = 'rgba(0,0,0,0.38)';
     arenaCtx.beginPath();
-    arenaCtx.ellipse(ground.x, ground.y + 10, PLAYER_RADIUS * 0.7, 6, 0, 0, Math.PI*2);
+    arenaCtx.ellipse(ground.x, ground.y + 2, PLAYER_RADIUS * 0.75, 6, 0, 0, Math.PI*2);
     arenaCtx.fill();
   } else {
     arenaCtx.fillStyle = 'rgba(0,0,0,0.45)';
