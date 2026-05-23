@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.177 — formula escala v3.113 (mul 0.5)</title>
+<title>Runecast v3.178 — spawnMage EXATO da v3.113</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   
@@ -10802,87 +10802,39 @@ const RUNECAST_3D = (function () {
     loader.load(url, (gltf) => {
       try {
         const innerModel = gltf.scene;
-        // v3.137 CAUSA RAIZ: o usuário notou que "as costas são transparentes,
-        // dá pra ver o interior". Isso é backface culling — o modelo do Meshy
-        // só renderiza um lado das faces. Quando vira de costas, vemos o
-        // interior oco (a frente por dentro). Forçar DoubleSide resolve: agora
-        // os dois lados de cada face são desenhados, então as costas aparecem.
-        innerModel.traverse(o => {
-          if ((o.isMesh || o.isSkinnedMesh) && o.material) {
-            const mats = Array.isArray(o.material) ? o.material : [o.material];
-            mats.forEach(m => { m.side = THREE.DoubleSide; m.needsUpdate = true; });
-          }
-        });
-        // v3.165: REPLICA FIEL da v3.113. O segredo: o modelo é CENTRADO dentro
-        // de um pivot (root), e a rotação vai no ROOT, não no inner. Como não
-        // podemos medir (escala do Armature explode), usamos o offset NATIVO
-        // conhecido: centro do modelo em (0, 1.0, 0.28), pés em y~0.
-        const root = new THREE.Group();
-        // v3.168: modelo tem altura nativa ~1.0 (medido pelos ossos). Centro já
-        // está perto da origem (X,Z ~0). Não deslocamos — a v3.113 também não
-        // deslocava, só normalizava. A rotação vai no ROOT.
+        // v3.178: RÉPLICA EXATA do spawnMage da v3.113 (lido do arquivo). A
+        // v3.113 MEDE com setFromObject, normaliza para altura 1.0, e centraliza
+        // o modelo nos pés dentro de um pivot. Eu evitava isso por medo da
+        // "armadilha do Armature", mas é EXATAMENTE o que a v3.113 faz e
+        // funciona. Replico fielmente.
+        const box = new THREE.Box3().setFromObject(innerModel);
+        const size = new THREE.Vector3(); box.getSize(size);
+        const center = new THREE.Vector3(); box.getCenter(center);
+        const modelHeight = size.y || 1;
+        const normScale = 1.0 / modelHeight;   // normaliza para altura = 1 unidade
+
+        const root = new THREE.Group();   // pivot
+        innerModel.position.x = -center.x * normScale;
+        innerModel.position.z = -center.z * normScale;
+        innerModel.position.y = -box.min.y * normScale;   // pés no chão (y=0)
+        innerModel.scale.setScalar(normScale);
         root.add(innerModel);
-        // v3.123: NÃO move o modelo (o deslocamento está dentro do esqueleto/
-        // Hips e mexer nisso quebra). Em vez disso, mede ONDE o modelo está e
-        // aponta a câmera para lá. Infalível: seja qual for a posição, a câmera
-        // enquadra. measureReal lê a posição/tamanho real renderizado.
-        function measureReal(obj) {
-          obj.updateWorldMatrix(true, true);
-          const b = new THREE.Box3(); let f = false;
-          obj.traverse(o => {
-            if ((o.isMesh || o.isSkinnedMesh) && o.geometry) {
-              o.geometry.computeBoundingBox();
-              const gb = o.geometry.boundingBox.clone();
-              gb.applyMatrix4(o.matrixWorld);
-              b.union(gb); f = true;
-            }
-          });
-          return f ? b : null;
-        }
-        // v3.127: NÃO normaliza a escala. Este modelo do Meshy tem escala 0.01
-        // no Armature, mas o skinning renderiza no tamanho NATIVO correto
-        // (~2.5 de altura, centrado na origem). Qualquer tentativa de medir e
-        // re-escalar cai na armadilha da escala do Armature e estoura o modelo
-        // (sc:117 = retângulo gigante). A solução é deixar como veio.
-        //
-        // Para enquadrar, usamos valores FIXOS conhecidos (medidos no Blender):
-        // altura ~2.5, centro na origem com leve offset Z.
-        const fcenter = new THREE.Vector3(0, 1.0, 0.28);
-        const knownHeight = 2.56;
-        // v3.154: câmera ortográfica é FIXA (alta/inclinada). Não reposicionamos.
-        // O enquadramento é controlado pelo zoom ortográfico, ajustado abaixo.
-        const camTarget = fcenter.clone();
-        const camDist = 9; // referência (não usada para mover a câmera ortográfica)
-        console.log('[3d] camera ortografica fixa, modelo altura', knownHeight);
 
         let mixer = null; const actions = {};
         let firstAction = null;
         if (gltf.animations && gltf.animations.length) {
           mixer = new THREE.AnimationMixer(innerModel);
           gltf.animations.forEach(clip => { actions[clip.name] = clip; });
-          // v3.118: toca a 1ª animação JÁ na carga, garantindo que o
-          // SkinnedMesh nunca fique numa pose degenerada (que o fazia sumir).
           firstAction = mixer.clipAction(gltf.animations[0]);
           firstAction.play();
         }
-        // v3.143: localiza o osso RAIZ do esqueleto (Hips). Girar o objeto não
-        // reorienta um SkinnedMesh (o skinning parte dos ossos), mas girar o
-        // osso raiz SIM. É a forma correta de virar o personagem de costas.
-        let hipsBone = null, skinnedMesh = null;
-        innerModel.traverse(o => {
-          if (o.isBone && /hips/i.test(o.name) && !hipsBone) hipsBone = o;
-          if (o.isSkinnedMesh && !skinnedMesh) skinnedMesh = o;
-        });
         api.models[heroKey] = {
           root, inner: innerModel, mixer, actions, animations: gltf.animations || [],
-          currentAction: firstAction, currentState: null,
-          hipsBone: hipsBone, skinnedMesh: skinnedMesh,
-          // v3.123: alvo e distância da câmera (medidos na posição real do modelo)
-          camTarget: camTarget, camDist: camDist
+          currentAction: firstAction, currentState: null, normScale: normScale
         };
         api.loadState[heroKey] = 'ready';
-        console.log('[3d]', heroKey, 'carregado:',
-          (gltf.animations || []).map(a => a.name));
+        console.log('[3d]', heroKey, 'carregado (spawn v3.113). altura',
+          modelHeight.toFixed(2), 'normScale', normScale.toFixed(4));
       } catch (e) {
         console.warn('[3d] pós-load falhou', heroKey, e);
         api.loadState[heroKey] = 'failed';
