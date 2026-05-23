@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.211 — diag cast</title>
+<title>Runecast v3.212 — cast timeScale fix</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13685,6 +13685,8 @@ function playAction(m, animName, loop = true) {
   action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
   action.clampWhenFinished = !loop;
   action.setEffectiveWeight(1.0);
+  action.timeScale = 1.0;   // v3.212: SEMPRE velocidade normal (evita herdar 0 de idle pausado)
+  action.enabled = true;
   action.fadeIn(0.15);
   action.play();
   m.currentAction = action;
