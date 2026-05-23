@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.209 — anim Drax corrigida (nomes trocados pelo Meshy)</title>
+<title>Runecast v3.210 — idle parado + cast visivel</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13502,14 +13502,14 @@ const ANIM_MAP_BY_HERO = {
     death:        'Dead',
   },
   DRAX: {
-    // v3.209: o Meshy EXPORTOU os nomes TROCADOS. Provado por render+medição:
-    // "Idle_02" é na verdade a MORTE (personagem cai no chão), e "Dead" é uma
-    // pose de idle parada. Mapeamos pelo MOVIMENTO REAL, não pelo nome.
-    idle:         'Dead',              // "Dead" = pose parada = idle real
+    // v3.210: nomes do Meshy TODOS embaralhados. Medido pelo movimento real dos
+    // pés: "Running" (mov 0.04) e "Run_03" (0.20) são as poses PARADAS = idle.
+    // "Dead" tem movimento (1.96), não serve p/ idle. "Idle_02" é a morte (cai).
+    idle:         'Running',           // "Running" = pés quase parados = idle real
     walking:      'Walking',
     walking_back: 'Walking',
     side:         'Walking',
-    running:      'Walking',           // os "Running/Run_03" saíram estáticos; usa Walking
+    running:      'Walking',
     cast:         'Axe_Spin_Attack',
     hit:          'Hit_Reaction_to_Waist',
     death:        'Idle_02',           // "Idle_02" = animação de queda = morte real
@@ -13733,7 +13733,10 @@ R3D.updateMage = function(id, gs) {
   window.__anim3d = window.__anim3d || {};
   window.__anim3d[id] = m.heroKey + ': estado=' + gs.state + ' anim=' + animName +
     ' existe=' + (!!m.actions[animName]);
-  const loop = (gs.state !== 'death' && gs.state !== 'cast' && gs.state !== 'hit');
+  // v3.210: cast agora em LOOP — animações de cast curtas (ex: Axe_Spin 0.63s)
+  // tocavam uma vez e congelavam, ficando quase invisíveis. Em loop, o gesto se
+  // repete durante todo o lançamento. Só death/hit tocam uma vez.
+  const loop = (gs.state !== 'death' && gs.state !== 'hit');
   if (m.currentState !== gs.state) {
     playAction(m, animName, loop);
     m.currentState = gs.state;
