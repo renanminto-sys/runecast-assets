@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.221 — sem debug + sombra 3D</title>
+<title>Runecast v3.222 — drax idle bind pose</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13826,26 +13826,18 @@ R3D.updateMage = function(id, gs) {
   const isDraxIdle = (m.heroKey === 'DRAX' && gs.state === 'idle');
 
   if (isDraxIdle) {
-    // v3.220: idle = pose NEUTRA de pé. Medição encontrou que o início da anim
-    // "Dead" (~3% do tempo) é a melhor pose parada (ereto, pés no chão, braços
-    // ao lado). Congela nesse frame com peso total. (Antes usava "Running" no
-    // frame 0, que pegava uma pose de meio-corrida — parecia voar/correr.)
-    if (m.currentAnimName !== '__idleStatic') {
-      const poseClip = m.actions['Dead'] || m.actions['Running'] || Object.values(m.actions)[0];
-      for (const n in m.actions) {
-        if (m.actions[n] !== poseClip) { m.actions[n].stop(); }
+    // v3.222: idle = BIND POSE original do modelo (A-pose limpa que veio do
+    // Meshy). Para todas as animações e restaura o esqueleto à pose de descanso.
+    // Mantém o mesh visível (não mexe em weight/enabled, que faziam sumir).
+    if (m.currentAnimName !== '__bindpose') {
+      for (const n in m.actions) { m.actions[n].stop(); }
+      m.currentAction = null;
+      if (m.model && m.model.traverse) {
+        m.model.traverse(o => {
+          if (o.isSkinnedMesh && o.skeleton) o.skeleton.pose();
+        });
       }
-      if (poseClip) {
-        poseClip.reset();
-        poseClip.enabled = true;
-        poseClip.setEffectiveWeight(1.0);
-        poseClip.play();
-        // congela na pose neutra (3% da duração do clip = em pé, antes de cair)
-        poseClip.time = (poseClip.getClip().duration || 1) * 0.03;
-        poseClip.timeScale = 0;     // congelado
-        m.currentAction = poseClip;
-      }
-      m.currentAnimName = '__idleStatic';
+      m.currentAnimName = '__bindpose';
       m.currentState = gs.state;
     }
   } else {
