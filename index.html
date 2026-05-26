@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.226 — Morwen e Kael 3D</title>
+<title>Runecast v3.227 — idle Kael, dano bot, fix movimento bot</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -8141,11 +8141,12 @@ function _castEffectImpl(caster, target, rune, tier) {
   // v3.14: multiplier de dano por passiva (Fúria)
   const dmgMul = getDamageMultiplier(caster);
   
-  // v3.97: PUXAR NÍVEL DA MAGIA (compartilhado, só player ganha bônus)
+  // v3.227: PUXAR NÍVEL DA MAGIA. Agora vale para JOGADOR E BOT — antes só o
+  // player recebia o bônus de nível, deixando o dano do bot fraco. O nível das
+  // magias é compartilhado (save.spellLevels), então o bot escala igual.
   let spellLevelMul = 1.0;
   let spellDurationBonus = 0;
-  if (caster && !caster.isBot) {
-    // Acha a chave da rune
+  {
     let runeKey = null;
     for (const k of Object.keys(RUNE_DEFS)) {
       if (RUNE_DEFS[k] === rune) { runeKey = k; break; }
@@ -8773,7 +8774,11 @@ function botMovement(dt) {
   const dy = bot.y - player.y;
   const distToPlayer = Math.sqrt(dx*dx + dy*dy) || 1;
   const idealDist = 240;
-  if (distToPlayer < idealDist - 30) {
+  // v3.227: afastamento mais firme quando MUITO perto (antes grudava no player).
+  if (distToPlayer < 120) {
+    desiredVx += (dx / distToPlayer) * 2.0;   // foge com força
+    desiredVy += (dy / distToPlayer) * 2.0;
+  } else if (distToPlayer < idealDist - 30) {
     desiredVx += (dx / distToPlayer) * 1.0;
     desiredVy += (dy / distToPlayer) * 1.0;
   } else if (distToPlayer > idealDist + 60) {
@@ -8822,6 +8827,22 @@ function botMovement(dt) {
     }
   }
   
+  // v3.227: FORÇA ANTI-BORDA. Sem isso, o bot ficava preso nos cantos da arena
+  // e parava de agir. Empurra de volta ao centro conforme se aproxima das bordas.
+  const margemX = arenaSize.w * 0.18;   // zona de "borda" lateral
+  const margemTop = worldSize.h * 0.18;
+  const margemBot = worldSize.h * 0.18;
+  if (bot.x < margemX) {
+    desiredVx += (1 - bot.x / margemX) * 1.5;          // empurra p/ direita
+  } else if (bot.x > arenaSize.w - margemX) {
+    desiredVx -= (1 - (arenaSize.w - bot.x) / margemX) * 1.5;
+  }
+  if (bot.y < margemTop) {
+    desiredVy += (1 - bot.y / margemTop) * 1.5;        // empurra p/ baixo
+  } else if (bot.y > worldSize.h - margemBot) {
+    desiredVy -= (1 - (worldSize.h - bot.y) / margemBot) * 1.5;
+  }
+
   const desLen = Math.sqrt(desiredVx*desiredVx + desiredVy*desiredVy);
   const botSpeedMul = bot.slowTimer > 0 ? bot.slowFactor : 1.0;
   // v3.14: Passiva Brisa do Aelar (também aplica ao bot)
@@ -13849,16 +13870,17 @@ R3D.updateMage = function(id, gs) {
   // Compara pela ANIMAÇÃO alvo (não pelo estado) para nunca travar.
   // v3.226: heróis SEM animação de idle real usam pose congelada (Drax e Kael).
   // Morwen e Aelar têm tratamento próprio (idle animado / Walking pausado).
-  const HEROES_IDLE_CONGELADO = { DRAX: 'Running', KAEL: 'Running' };
+  // v3.227: clip e MOMENTO do idle congelado por herói (Drax 50%, Kael 0%).
+  const HEROES_IDLE_CONGELADO = {
+    DRAX: { clip: 'Running', pct: 0.5 },
+    KAEL: { clip: 'Running', pct: 0.0 },
+  };
   const usaIdleCongelado = (gs.state === 'idle' && HEROES_IDLE_CONGELADO[m.heroKey]);
 
   if (usaIdleCongelado) {
-    // v3.226: idle congelado para heróis sem idle real (Drax, Kael). "Running"
-    // a 50% do ciclo = pose de descanso firme, boa de frente e de costas. Frame
-    // de animação (não bind pose, que encolhe o modelo pela escala 0.01 e some).
+    const cfg = HEROES_IDLE_CONGELADO[m.heroKey];
     if (m.currentAnimName !== '__idleStatic') {
-      const clipName = HEROES_IDLE_CONGELADO[m.heroKey] || 'Running';
-      const poseClip = m.actions[clipName] || m.actions['Walking'] || Object.values(m.actions)[0];
+      const poseClip = m.actions[cfg.clip] || m.actions['Walking'] || Object.values(m.actions)[0];
       for (const n in m.actions) {
         if (m.actions[n] !== poseClip) { m.actions[n].stop(); }
       }
@@ -13867,7 +13889,7 @@ R3D.updateMage = function(id, gs) {
         poseClip.enabled = true;
         poseClip.setEffectiveWeight(1.0);
         poseClip.play();
-        poseClip.time = (poseClip.getClip().duration || 1) * 0.5;  // 50% do ciclo
+        poseClip.time = (poseClip.getClip().duration || 1) * cfg.pct;
         poseClip.timeScale = 0;     // congelado
         m.currentAction = poseClip;
       }
