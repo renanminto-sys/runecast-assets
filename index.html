@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.227 — idle Kael, dano bot, fix movimento bot</title>
+<title>Runecast v3.228 — skins reais nos cards</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -1387,8 +1387,21 @@
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
     transition: transform 0.3s;
   }
-  .hero-card:active .hero-svg {
+  /* v3.228: retrato com a arte real do mago (substitui o SVG desenhado) */
+  .hero-card .hero-portrait {
+    width: 70px;
+    height: 105px;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+    transition: transform 0.3s;
+  }
+  .hero-card:active .hero-portrait {
     transform: scale(1.1) rotate(-3deg);
+  }
+  #menu-screen.collection-mode .hero-card .hero-portrait {
+    width: 50px; height: 75px;
+    margin: 0 auto;
   }
   .hero-card .hero-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
   .hero-card .hero-name { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
@@ -3082,28 +3095,7 @@
     
     <div id="hero-grid">
       <button class="hero-card" data-hero="AELAR">
-        <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="orbAelar"><stop offset="0%" stop-color="#e0f7fa"/><stop offset="60%" stop-color="#4dd0e1"/><stop offset="100%" stop-color="#4dd0e1" stop-opacity="0"/></radialGradient>
-            <linearGradient id="robeAelar" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#26a69a"/><stop offset="100%" stop-color="#00695c"/></linearGradient>
-          </defs>
-          <!-- Orbe -->
-          <circle cx="62" cy="22" r="11" fill="url(#orbAelar)" opacity="0.9"/>
-          <circle cx="62" cy="22" r="4" fill="#fff" opacity="0.95"/>
-          <!-- Cajado -->
-          <line x1="62" y1="28" x2="48" y2="110" stroke="#5d4037" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- Capuz/cabeça -->
-          <path d="M 25 38 Q 18 22, 38 18 Q 50 16, 56 24 Q 60 38, 52 46 L 30 46 Z" fill="url(#robeAelar)"/>
-          <!-- Sombra do rosto -->
-          <ellipse cx="38" cy="34" rx="9" ry="11" fill="#000" opacity="0.7"/>
-          <!-- Olhos -->
-          <circle cx="34" cy="33" r="1.5" fill="#4dd0e1"/>
-          <circle cx="42" cy="33" r="1.5" fill="#4dd0e1"/>
-          <!-- Manto -->
-          <path d="M 30 46 L 18 112 L 56 112 L 50 46 Z" fill="url(#robeAelar)"/>
-          <!-- Broche -->
-          <circle cx="38" cy="62" r="2.5" fill="#4dd0e1"/>
-        </svg>
+        <img class="hero-portrait" src="https://renanminto-sys.github.io/runecast-assets/card_aelar.png" alt="AELAR" />
         <div class="hero-info">
           <div class="hero-name">Aelar</div>
           <div class="hero-subtitle">Arquimago do Vento</div>
@@ -3111,21 +3103,7 @@
         </div>
       </button>
       <button class="hero-card" data-hero="MORWEN">
-        <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="orbMorwen"><stop offset="0%" stop-color="#f3e5f5"/><stop offset="60%" stop-color="#ce93d8"/><stop offset="100%" stop-color="#ce93d8" stop-opacity="0"/></radialGradient>
-            <linearGradient id="robeMorwen" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4a148c"/><stop offset="100%" stop-color="#1a0033"/></linearGradient>
-          </defs>
-          <circle cx="62" cy="22" r="11" fill="url(#orbMorwen)" opacity="0.9"/>
-          <circle cx="62" cy="22" r="4" fill="#fff" opacity="0.95"/>
-          <line x1="62" y1="28" x2="48" y2="110" stroke="#3e2723" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M 25 38 Q 18 22, 38 18 Q 50 16, 56 24 Q 60 38, 52 46 L 30 46 Z" fill="url(#robeMorwen)"/>
-          <ellipse cx="38" cy="34" rx="9" ry="11" fill="#000" opacity="0.8"/>
-          <circle cx="34" cy="33" r="1.5" fill="#ce93d8"/>
-          <circle cx="42" cy="33" r="1.5" fill="#ce93d8"/>
-          <path d="M 30 46 L 18 112 L 56 112 L 50 46 Z" fill="url(#robeMorwen)"/>
-          <circle cx="38" cy="62" r="2.5" fill="#ce93d8"/>
-        </svg>
+        <img class="hero-portrait" src="https://renanminto-sys.github.io/runecast-assets/card_morwen.png" alt="MORWEN" />
         <div class="hero-info">
           <div class="hero-name">Morwen</div>
           <div class="hero-subtitle">Necromante das Sombras</div>
@@ -3133,22 +3111,7 @@
         </div>
       </button>
       <button class="hero-card" data-hero="DRAX">
-        <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="orbDrax"><stop offset="0%" stop-color="#fff3e0"/><stop offset="60%" stop-color="#ff6f00"/><stop offset="100%" stop-color="#ff6f00" stop-opacity="0"/></radialGradient>
-            <linearGradient id="robeDrax" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bf360c"/><stop offset="100%" stop-color="#6a1b00"/></linearGradient>
-          </defs>
-          <circle cx="62" cy="22" r="13" fill="url(#orbDrax)" opacity="0.9"/>
-          <circle cx="62" cy="22" r="5" fill="#fff" opacity="0.95"/>
-          <line x1="62" y1="28" x2="48" y2="110" stroke="#4e342e" stroke-width="3" stroke-linecap="round"/>
-          <!-- Drax é mais robusto: manto mais largo -->
-          <path d="M 22 38 Q 14 22, 38 18 Q 52 16, 58 24 Q 62 38, 54 46 L 28 46 Z" fill="url(#robeDrax)"/>
-          <ellipse cx="38" cy="34" rx="10" ry="11" fill="#000" opacity="0.7"/>
-          <circle cx="34" cy="33" r="1.5" fill="#ff6f00"/>
-          <circle cx="42" cy="33" r="1.5" fill="#ff6f00"/>
-          <path d="M 28 46 L 14 112 L 58 112 L 54 46 Z" fill="url(#robeDrax)"/>
-          <circle cx="36" cy="62" r="2.8" fill="#ff6f00"/>
-        </svg>
+        <img class="hero-portrait" src="https://renanminto-sys.github.io/runecast-assets/card_drax.png" alt="DRAX" />
         <div class="hero-info">
           <div class="hero-name">Drax</div>
           <div class="hero-subtitle">Bárbaro Místico</div>
@@ -3157,32 +3120,7 @@
       </button>
       <!-- v3.87: KAEL — Cronomante -->
       <button class="hero-card" data-hero="KAEL">
-        <svg class="hero-svg" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <radialGradient id="orbKael"><stop offset="0%" stop-color="#fff8e1"/><stop offset="60%" stop-color="#ffd54f"/><stop offset="100%" stop-color="#ffd54f" stop-opacity="0"/></radialGradient>
-            <linearGradient id="robeKael" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#37474f"/><stop offset="100%" stop-color="#1c2833"/></linearGradient>
-          </defs>
-          <!-- Ampulheta (orbe) -->
-          <circle cx="62" cy="22" r="12" fill="url(#orbKael)" opacity="0.9"/>
-          <!-- desenha ampulheta dentro do orbe -->
-          <g transform="translate(62, 22)" stroke="#ffd54f" stroke-width="1" fill="#ffd54f">
-            <path d="M -3.5 -4 L 3.5 -4 L 0 0 Z" />
-            <path d="M -3.5 4 L 3.5 4 L 0 0 Z" />
-          </g>
-          <line x1="62" y1="28" x2="48" y2="110" stroke="#263238" stroke-width="2.5" stroke-linecap="round"/>
-          <!-- Capuz/cabeça -->
-          <path d="M 25 38 Q 18 22, 38 18 Q 50 16, 56 24 Q 60 38, 52 46 L 30 46 Z" fill="url(#robeKael)"/>
-          <ellipse cx="38" cy="34" rx="9" ry="11" fill="#000" opacity="0.78"/>
-          <circle cx="34" cy="33" r="1.5" fill="#ffd54f"/>
-          <circle cx="42" cy="33" r="1.5" fill="#ffd54f"/>
-          <!-- Manto -->
-          <path d="M 30 46 L 18 112 L 56 112 L 50 46 Z" fill="url(#robeKael)"/>
-          <!-- Broche dourado em forma de ampulheta -->
-          <g transform="translate(38, 62)" stroke="#ffd54f" stroke-width="0.6" fill="#ffd54f">
-            <path d="M -2 -2.5 L 2 -2.5 L 0 0 Z" />
-            <path d="M -2 2.5 L 2 2.5 L 0 0 Z" />
-          </g>
-        </svg>
+        <img class="hero-portrait" src="https://renanminto-sys.github.io/runecast-assets/card_kael.png" alt="KAEL" />
         <div class="hero-info">
           <div class="hero-name">Kael</div>
           <div class="hero-subtitle">Cronomante</div>
