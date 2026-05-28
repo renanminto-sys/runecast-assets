@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.229 — cards PNG maiusculo</title>
+<title>Runecast v3.230 — cards maiores + tela detalhe + home</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -822,6 +822,14 @@
     display: block;
     image-rendering: -webkit-optimize-contrast;
   }
+  /* v3.230: retrato da home (arte real do mago) */
+  .home-mage-portrait {
+    width: 200px;
+    height: 260px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 8px 20px rgba(0,0,0,0.55));
+  }
   .home-mage-info {
     text-align: center;
     margin-top: 2px;
@@ -1388,9 +1396,10 @@
     transition: transform 0.3s;
   }
   /* v3.228: retrato com a arte real do mago (substitui o SVG desenhado) */
+  /* v3.230: tamanho maior para destacar a arte */
   .hero-card .hero-portrait {
-    width: 70px;
-    height: 105px;
+    width: 100px;
+    height: 150px;
     flex-shrink: 0;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
@@ -1400,7 +1409,7 @@
     transform: scale(1.1) rotate(-3deg);
   }
   #menu-screen.collection-mode .hero-card .hero-portrait {
-    width: 50px; height: 75px;
+    width: 70px; height: 105px;
     margin: 0 auto;
   }
   .hero-card .hero-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
@@ -3015,7 +3024,7 @@
       </div>
     </div>
     <div class="home-mage-stage">
-      <canvas id="home-mage-canvas" width="220" height="280"></canvas>
+      <img id="home-mage-portrait" class="home-mage-portrait" alt="" />
       <div class="home-mage-info">
         <div class="home-mage-name" id="home-mage-name">Aelar</div>
         <div class="home-mage-sub" id="home-mage-sub">Arquimago do Vento</div>
@@ -12460,7 +12469,7 @@ function showHomeScreen() {
   home.classList.remove('hidden');
   
   refreshHomeScreen();
-  startHomeMageAnimation();
+  // v3.230: animação 2D substituída por imagem real do mago (ver refreshHomeScreen)
 }
 
 function refreshHomeScreen() {
@@ -12470,6 +12479,13 @@ function refreshHomeScreen() {
   
   document.getElementById('home-mage-name').textContent = hero.name;
   document.getElementById('home-mage-sub').textContent = hero.subtitle;
+  // v3.230: atualiza retrato real do mago
+  const portrait = document.getElementById('home-mage-portrait');
+  if (portrait) {
+    const map = { AELAR:'card_aelar.PNG', DRAX:'card_drax.PNG', MORWEN:'card_morwen.PNG', KAEL:'card_kael.PNG' };
+    portrait.src = 'https://renanminto-sys.github.io/runecast-assets/' + (map[heroKey] || map.AELAR);
+    portrait.alt = hero.name;
+  }
   
   const atk = RUNE_DEFS[build.attack];
   const def = RUNE_DEFS[build.defense];
@@ -12749,7 +12765,8 @@ function showHeroDetail(heroKey) {
   // Renderiza ficha do mago em formato de CARTA DE BARALHO
   const ult = RUNE_DEFS[hero.ultimate];
   const card = document.getElementById('hero-card-deck-content');
-  const sourceCard = document.querySelector(`.hero-card[data-hero="${heroKey}"] .hero-svg`);
+  // v3.230: clona o retrato (img). Antes procurava .hero-svg, que não existe mais.
+  const sourceCard = document.querySelector(`.hero-card[data-hero="${heroKey}"] .hero-portrait`);
   const svgHTML = sourceCard ? sourceCard.outerHTML : '';
   card.innerHTML = `
     <div class="hcd-rank-corner">★ ★ ★</div>
