@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.230 — cards maiores + tela detalhe + home</title>
+<title>Runecast v3.231 — arena 3D Smash Ball + camera nova</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13604,6 +13604,78 @@ R3D.buildArena = function() {
   console.log('[3D] arena 3D construída');
 };
 
+// v3.231: ARENA 3D estilo Smash Ball. Plataforma retangular com profundidade +
+// ambiente de masmorra ao fundo. Topo em y=0 (onde os magos andam). Construída
+// na MESMA cena dos magos, então fica coerente com a câmera e o posicionamento.
+R3D.buildArena3D = function() {
+  if (R3D.arena3D) { R3D.scene.remove(R3D.arena3D); }
+  const g = new THREE.Group();
+  const PW = 5.4, PD = 13.0, PH = 1.8, cz = -1.1;
+
+  function stoneTex() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    x.fillStyle = '#3a322e'; x.fillRect(0,0,256,256);
+    for (let i=0;i<1800;i++){ const v=40+Math.random()*36; x.fillStyle='rgba('+v+','+(v-6)+','+(v-10)+',0.4)'; x.fillRect(Math.random()*256,Math.random()*256,2,2); }
+    x.strokeStyle='rgba(18,14,12,0.8)'; x.lineWidth=3;
+    for (let i=0;i<=4;i++){ x.beginPath();x.moveTo(i*64,0);x.lineTo(i*64,256);x.stroke(); x.beginPath();x.moveTo(0,i*64);x.lineTo(256,i*64);x.stroke(); }
+    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,4); return t;
+  }
+  const floorTex = stoneTex();
+  const slabMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 });
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0x1c1612, roughness: 1 });
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, PD),
+    [sideMat, sideMat, slabMat, sideMat, sideMat, sideMat]);
+  slab.position.set(0, -PH/2, cz); g.add(slab);
+
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0x6a5538, roughness: 0.5, metalness: 0.3, emissive: 0x402810, emissiveIntensity: 0.5 });
+  const eh = 0.24, et = 0.38;
+  [[PW+et,et,0,cz+PD/2],[PW+et,et,0,cz-PD/2],[et,PD+et,-PW/2,cz],[et,PD+et,PW/2,cz]].forEach(([w,d,x,z]) => {
+    const e = new THREE.Mesh(new THREE.BoxGeometry(w, eh, d), edgeMat);
+    e.position.set(x, eh/2, z); g.add(e);
+  });
+
+  const runeMat = new THREE.MeshStandardMaterial({ color: 0x7733cc, emissive: 0x5511aa, emissiveIntensity: 0.7, transparent: true, opacity: 0.5 });
+  [[1.6,1.85],[1.0,1.1]].forEach(([ri,ro]) => {
+    const r = new THREE.Mesh(new THREE.RingGeometry(ri, ro, 48), runeMat);
+    r.rotation.x = -Math.PI/2; r.position.set(0, 0.02, cz); g.add(r);
+  });
+
+  // poças de lava na superfície (animadas no render)
+  R3D.arenaLavas = [];
+  const lavaMat = new THREE.MeshStandardMaterial({ color: 0xff5520, emissive: 0xff3a00, emissiveIntensity: 1.0, roughness: 0.4 });
+  [[-1.3,2.5,0.9],[1.5,-1.5,0.75],[-0.5,-4,0.85]].forEach(([x,z,r]) => {
+    const l = new THREE.Mesh(new THREE.CircleGeometry(r, 20), lavaMat.clone());
+    l.rotation.x = -Math.PI/2; l.scale.y = 1.5; l.position.set(x, 0.03, cz+z); g.add(l);
+    R3D.arenaLavas.push(l);
+  });
+
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2a2230, roughness: 0.95 });
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x201a2a, roughness: 1 });
+  // v3.231: parede mais baixa e próxima, para não ficar "solta" no topo do quadro
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(PW+6, 6, 0.8), wallMat);
+  backWall.position.set(0, 1.5, cz - PD/2 - 0.6); g.add(backWall);
+  for (let r=0;r<4;r++) for (let c=0;c<6;c++) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.7, 0.2), stoneMat);
+    b.position.set(-3.5 + c*1.4 + (r%2)*0.7, 0.6 + r*1.4, cz - PD/2 - 0.25); g.add(b);
+  }
+  [-PW/2-0.9, PW/2+0.9].forEach(x => {
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 5.5, 12), stoneMat);
+    p.position.set(x, 2.75, cz - PD/2 + 0.2); g.add(p);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.4), edgeMat);
+    cap.position.set(x, 5.5, cz - PD/2 + 0.2); g.add(cap);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.4), edgeMat);
+    base.position.set(x, 0.25, cz - PD/2 + 0.2); g.add(base);
+    const fire = new THREE.PointLight(0xff7722, 1.4, 9); fire.position.set(x, 4.2, cz - PD/2 + 1); g.add(fire);
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff8833, emissive: 0xff5500, emissiveIntensity: 2 }));
+    flame.position.set(x, 4.2, cz - PD/2 + 1); g.add(flame);
+  });
+
+  R3D.arena3D = g;
+  R3D.scene.add(g);
+  console.log('[3D] arena 3D Smash Ball construída');
+};
+
 R3D.init = function() {
   if (R3D.scene) return;
   const canvas = document.getElementById('three-canvas');
@@ -13616,10 +13688,13 @@ R3D.init = function() {
 
   R3D.scene = new THREE.Scene();
 
-  // v3.111: câmera inclinada estilo Brawl Stars/MOBA (vê o personagem de frente-cima)
+  // v3.231: câmera ângulo "Smash Ball" — mais baixa e inclinada que a anterior
+  // (era 0,11,9 look 1.2), para mostrar a PROFUNDIDADE do palco 3D. Os magos
+  // continuam corretos: posição vem de unproject (independe da câmera) e a escala
+  // é proporcional ao frustum (viewWorldH). frustum=12 é setado no resize.
   R3D.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-  R3D.camera.position.set(0, 11, 9);
-  R3D.camera.lookAt(0, 1.2, 0);
+  R3D.camera.position.set(0, 9, 11);
+  R3D.camera.lookAt(0, 0.8, 0);
 
   // Luzes
   const ambient = new THREE.AmbientLight(0xffffff, 1.4);
@@ -13633,6 +13708,19 @@ R3D.init = function() {
   R3D.scene.add(fill);
 
   R3D.clock = new THREE.Clock();
+
+  // v3.231: arena 3D Smash Ball. Controlada por flag (R3D.arena3DEnabled).
+  // Começa LIGADA. Salvaguarda: abrir com ?arena2d=1 na URL volta ao fundo 2D
+  // antigo (caso a arena 3D precise ser desativada rápido no teste).
+  if (R3D.arena3DEnabled === undefined) {
+    const params = new URLSearchParams(location.search);
+    R3D.arena3DEnabled = (params.get('arena2d') !== '1');
+  }
+  if (R3D.arena3DEnabled) {
+    R3D.buildArena3D();
+    const bg = document.getElementById('arena-ruins-bg');
+    if (bg) bg.style.display = 'none';
+  }
 
   // v3.206: MULTI-MODELO. Carrega Aelar e Drax (os dois magos 3D). Cada um fica
   // em R3D.models[heroKey] = { model, animations }. O spawnMage usa o do herói.
@@ -13696,7 +13784,7 @@ R3D.resize = function() {
   }
   R3D._w = w; R3D._h = h;
   const aspect = w / h;
-  const viewH = 8;
+  const viewH = 12;  // v3.231: frustum maior p/ câmera Smash Ball (era 8)
   R3D.camera.left = -viewH * aspect / 2;
   R3D.camera.right = viewH * aspect / 2;
   R3D.camera.top = viewH / 2;
@@ -13876,6 +13964,13 @@ R3D.render = function() {
     const dt = Math.min(R3D.clock.getDelta(), 0.1);
     for (const id in R3D.mages) {
       R3D.mages[id].mixer.update(dt);
+    }
+    // v3.231: pulso da lava da arena 3D
+    if (R3D.arenaLavas) {
+      R3D._lavaT = (R3D._lavaT || 0) + dt;
+      for (let i = 0; i < R3D.arenaLavas.length; i++) {
+        R3D.arenaLavas[i].material.emissiveIntensity = 0.8 + Math.sin(R3D._lavaT * 2 + i) * 0.3;
+      }
     }
     R3D.renderer.render(R3D.scene, R3D.camera);
   } catch (e) {
