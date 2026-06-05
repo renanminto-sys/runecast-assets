@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.232 — arena maior, hud minimo, sem formas 2D</title>
+<title>Runecast v3.233 — arena modelo 3D real</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13576,60 +13576,47 @@ R3D.buildArena = function() {
 // na MESMA cena dos magos, então fica coerente com a câmera e o posicionamento.
 R3D.buildArena3D = function() {
   if (R3D.arena3D) { R3D.scene.remove(R3D.arena3D); }
-  const g = new THREE.Group();
-  const PW = 6.4, PD = 15.0, PH = 1.8, cz = -1.1;  // v3.232: arena maior
-
-  function stoneTex() {
-    const c = document.createElement('canvas'); c.width = c.height = 256;
-    const x = c.getContext('2d');
-    x.fillStyle = '#3a322e'; x.fillRect(0,0,256,256);
-    for (let i=0;i<1800;i++){ const v=40+Math.random()*36; x.fillStyle='rgba('+v+','+(v-6)+','+(v-10)+',0.4)'; x.fillRect(Math.random()*256,Math.random()*256,2,2); }
-    x.strokeStyle='rgba(18,14,12,0.8)'; x.lineWidth=3;
-    for (let i=0;i<=4;i++){ x.beginPath();x.moveTo(i*64,0);x.lineTo(i*64,256);x.stroke(); x.beginPath();x.moveTo(0,i*64);x.lineTo(256,i*64);x.stroke(); }
-    const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(2,4); return t;
-  }
-  const floorTex = stoneTex();
-  const slabMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 });
-  const sideMat = new THREE.MeshStandardMaterial({ color: 0x1c1612, roughness: 1 });
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, PD),
-    [sideMat, sideMat, slabMat, sideMat, sideMat, sideMat]);
-  slab.position.set(0, -PH/2, cz); g.add(slab);
-
-  const edgeMat = new THREE.MeshStandardMaterial({ color: 0x6a5538, roughness: 0.5, metalness: 0.3, emissive: 0x402810, emissiveIntensity: 0.5 });
-  const eh = 0.24, et = 0.38;
-  [[PW+et,et,0,cz+PD/2],[PW+et,et,0,cz-PD/2],[et,PD+et,-PW/2,cz],[et,PD+et,PW/2,cz]].forEach(([w,d,x,z]) => {
-    const e = new THREE.Mesh(new THREE.BoxGeometry(w, eh, d), edgeMat);
-    e.position.set(x, eh/2, z); g.add(e);
+  // v3.233: carrega o MODELO 3D real da arena (gerado no Meshy) no lugar da
+  // geometria de caixas. Escala para cobrir a área de jogo e posiciona o topo
+  // da plataforma em y=0 (onde os magos andam).
+  const ARENA_URL = 'arena_otimizada.glb';
+  const loader = new GLTFLoader();
+  loader.load(ARENA_URL, (gltf) => {
+    const model = gltf.scene;
+    // mede o tamanho original
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const center = new THREE.Vector3(); box.getCenter(center);
+    // escala: queremos a largura cobrindo ~7 unidades (área de jogo X ~4.5 + folga)
+    // e a profundidade ~13 unidades. Escala não-uniforme (área é mais funda que larga).
+    const targetW = 7.5, targetD = 14.0;
+    const sx = targetW / (size.x || 1);
+    const sz = targetD / (size.z || 1);
+    const sy = (sx + sz) / 2;  // altura: média, para não achatar/esticar demais
+    model.scale.set(sx, sy, sz);
+    // recalcula o box após escalar para posicionar o topo em y=0
+    model.updateMatrixWorld(true);
+    const box2 = new THREE.Box3().setFromObject(model);
+    model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X
+    model.position.z -= (box2.min.z + box2.max.z) / 2;   // centraliza Z
+    model.position.z += -1.1;                            // leve recuo (área vai de -6.5 a 4.3)
+    model.position.y -= box2.max.y;                      // topo em y=0
+    // garante materiais opacos
+    model.traverse(o => {
+      if (o.isMesh && o.material) {
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        mats.forEach(m => { m.side = THREE.FrontSide; m.depthWrite = true; m.needsUpdate = true; });
+      }
+    });
+    R3D.arena3D = model;
+    R3D.scene.add(model);
+    console.log('[3D] arena 3D (modelo) carregada. Escala:', sx.toFixed(2), sy.toFixed(2), sz.toFixed(2));
+  }, undefined, (err) => {
+    console.error('[3D] falha ao carregar arena, usando fundo 2D:', err);
+    const bg = document.getElementById('arena-ruins-bg');
+    if (bg) bg.style.display = '';
   });
-
-  // v3.232: removidos o anel de runas roxo e as poças de lava da superfície —
-  // ficavam como formas 2D estranhas no meio da arena. Superfície limpa.
   R3D.arenaLavas = [];
-
-  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x2a2230, roughness: 0.95 });
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x201a2a, roughness: 1 });
-  // v3.231: parede mais baixa e próxima, para não ficar "solta" no topo do quadro
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(PW+6, 6, 0.8), wallMat);
-  backWall.position.set(0, 1.5, cz - PD/2 - 0.6); g.add(backWall);
-  for (let r=0;r<4;r++) for (let c=0;c<6;c++) {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.7, 0.2), stoneMat);
-    b.position.set(-3.5 + c*1.4 + (r%2)*0.7, 0.6 + r*1.4, cz - PD/2 - 0.25); g.add(b);
-  }
-  [-PW/2-0.9, PW/2+0.9].forEach(x => {
-    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 5.5, 12), stoneMat);
-    p.position.set(x, 2.75, cz - PD/2 + 0.2); g.add(p);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.4), edgeMat);
-    cap.position.set(x, 5.5, cz - PD/2 + 0.2); g.add(cap);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 1.4), edgeMat);
-    base.position.set(x, 0.25, cz - PD/2 + 0.2); g.add(base);
-    const fire = new THREE.PointLight(0xff7722, 1.4, 9); fire.position.set(x, 4.2, cz - PD/2 + 1); g.add(fire);
-    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff8833, emissive: 0xff5500, emissiveIntensity: 2 }));
-    flame.position.set(x, 4.2, cz - PD/2 + 1); g.add(flame);
-  });
-
-  R3D.arena3D = g;
-  R3D.scene.add(g);
-  console.log('[3D] arena 3D Smash Ball construída');
 };
 
 R3D.init = function() {
