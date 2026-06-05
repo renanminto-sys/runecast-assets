@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.233 — arena modelo 3D real</title>
+<title>Runecast v3.234 — camera perspectiva opcional (persp=1)</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13631,13 +13631,20 @@ R3D.init = function() {
 
   R3D.scene = new THREE.Scene();
 
-  // v3.231: câmera ângulo "Smash Ball" — mais baixa e inclinada que a anterior
-  // (era 0,11,9 look 1.2), para mostrar a PROFUNDIDADE do palco 3D. Os magos
-  // continuam corretos: posição vem de unproject (independe da câmera) e a escala
-  // é proporcional ao frustum (viewWorldH). frustum=12 é setado no resize.
-  R3D.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-  R3D.camera.position.set(0, 9, 11);
-  R3D.camera.lookAt(0, 0.8, 0);
+  // v3.234: câmera comutável para calibrar a profundidade Smash Ball.
+  // Padrão: ortográfica (atual). Com ?persp=1 na URL: perspectiva (dá profundidade
+  // real, linhas convergem). Permite comparar as duas no mesmo build.
+  const _params = new URLSearchParams(location.search);
+  R3D.usePerspective = (_params.get('persp') === '1');
+  if (R3D.usePerspective) {
+    R3D.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
+    R3D.camera.position.set(0, 8, 13);
+    R3D.camera.lookAt(0, 0.5, -1);
+  } else {
+    R3D.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+    R3D.camera.position.set(0, 9, 11);
+    R3D.camera.lookAt(0, 0.8, 0);
+  }
 
   // Luzes
   const ambient = new THREE.AmbientLight(0xffffff, 1.4);
@@ -13727,12 +13734,18 @@ R3D.resize = function() {
   }
   R3D._w = w; R3D._h = h;
   const aspect = w / h;
-  const viewH = 12;  // v3.231: frustum maior p/ câmera Smash Ball (era 8)
-  R3D.camera.left = -viewH * aspect / 2;
-  R3D.camera.right = viewH * aspect / 2;
-  R3D.camera.top = viewH / 2;
-  R3D.camera.bottom = -viewH / 2;
-  R3D.camera.updateProjectionMatrix();
+  if (R3D.usePerspective) {
+    // v3.234: perspectiva — ajusta só o aspect
+    R3D.camera.aspect = aspect;
+    R3D.camera.updateProjectionMatrix();
+  } else {
+    const viewH = 12;  // frustum p/ câmera ortográfica Smash Ball
+    R3D.camera.left = -viewH * aspect / 2;
+    R3D.camera.right = viewH * aspect / 2;
+    R3D.camera.top = viewH / 2;
+    R3D.camera.bottom = -viewH / 2;
+    R3D.camera.updateProjectionMatrix();
+  }
 };
 
 // Cria uma instância 3D do mago pra um id (player/bot)
@@ -13832,7 +13845,15 @@ R3D.updateMage = function(id, gs) {
   const mul = (R3D.scaleMul !== undefined ? R3D.scaleMul : 0.357);
   // referência: altura desejada em px -> fração da tela -> unidades de mundo no plano
   // usamos a altura visível do frustum no plano do chão
-  const viewWorldH = (R3D.camera.top - R3D.camera.bottom);
+  // v3.234: altura visível do mundo no plano do chão. Ortográfica: frustum.
+  // Perspectiva: calcula pela distância da câmera ao plano e o FOV.
+  let viewWorldH;
+  if (R3D.usePerspective) {
+    const camDist = R3D.camera.position.length();  // dist aproximada ao centro
+    viewWorldH = 2 * camDist * Math.tan((R3D.camera.fov * Math.PI / 180) / 2);
+  } else {
+    viewWorldH = (R3D.camera.top - R3D.camera.bottom);
+  }
   const targetUnits = (mage2DHeightPx / h) * viewWorldH * mul;
   m.root.scale.setScalar(targetUnits);
 
