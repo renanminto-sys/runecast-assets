@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.234 — camera perspectiva opcional (persp=1)</title>
+<title>Runecast v3.235 — arena realinhada area de jogo</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13587,20 +13587,23 @@ R3D.buildArena3D = function() {
     const box = new THREE.Box3().setFromObject(model);
     const size = new THREE.Vector3(); box.getSize(size);
     const center = new THREE.Vector3(); box.getCenter(center);
-    // escala: queremos a largura cobrindo ~7 unidades (área de jogo X ~4.5 + folga)
-    // e a profundidade ~13 unidades. Escala não-uniforme (área é mais funda que larga).
-    const targetW = 7.5, targetD = 14.0;
+    // v3.235: escala para cobrir a ÁREA DE JOGO REAL medida (não valores
+    // arbitrários). Com a câmera atual, o chão visível é X[-3.38,3.37] (~6.75) e
+    // Z[-11.1,9.0] (~20), centro Z≈-1.07. A arena precisa cobrir isso, senão o
+    // personagem anda "para fora" dela (paredes invisíveis) e o oponente nasce
+    // atrás. Damos folga para a arena exceder um pouco a área jogável.
+    const targetW = 7.5;    // largura
+    const targetD = 16.0;   // profundidade (meio-termo: cobre boa parte sem deformar a arte)
     const sx = targetW / (size.x || 1);
     const sz = targetD / (size.z || 1);
-    const sy = (sx + sz) / 2;  // altura: média, para não achatar/esticar demais
+    const sy = Math.min(sx, sz);  // altura: menor escala, p/ não esticar a parede pra cima
     model.scale.set(sx, sy, sz);
-    // recalcula o box após escalar para posicionar o topo em y=0
     model.updateMatrixWorld(true);
     const box2 = new THREE.Box3().setFromObject(model);
-    model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X
+    model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X em 0
     model.position.z -= (box2.min.z + box2.max.z) / 2;   // centraliza Z
-    model.position.z += -1.1;                            // leve recuo (área vai de -6.5 a 4.3)
-    model.position.y -= box2.max.y;                      // topo em y=0
+    model.position.z += -1.07;                           // centro de profundidade da área
+    model.position.y -= box2.max.y;                      // topo da arena em y=0
     // garante materiais opacos
     model.traverse(o => {
       if (o.isMesh && o.material) {
