@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.237 — arena cobre topo</title>
+<title>Runecast v3.238 — arena atras do timer</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13599,7 +13599,7 @@ R3D.buildArena3D = function() {
     // personagem anda "para fora" dela (paredes invisíveis) e o oponente nasce
     // atrás. Damos folga para a arena exceder um pouco a área jogável.
     const targetW = 7.5;    // largura
-    const targetD = 21.0;   // profundidade: cobre Z[-11,9] visível + folga (elimina faixa preta no topo)
+    const targetD = 24.0;   // v3.238: mais profundidade — arena sobe atrás do timer/HUD, fechando a faixa preta superior (ok perder um pouco atrás do HUD)
     const sx = targetW / (size.x || 1);
     const sz = targetD / (size.z || 1);
     const sy = Math.min(sx, sz);  // altura: menor escala, p/ não esticar a parede pra cima
@@ -13608,7 +13608,7 @@ R3D.buildArena3D = function() {
     const box2 = new THREE.Box3().setFromObject(model);
     model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X em 0
     model.position.z -= (box2.min.z + box2.max.z) / 2;   // centraliza Z
-    model.position.z += -1.07;                           // centro de profundidade da área
+    model.position.z += -2.5;                            // v3.238: recuo maior — arena sobe atrás do timer/HUD superior
     model.position.y -= box2.max.y;                      // topo da arena em y=0
     // garante materiais opacos
     model.traverse(o => {
