@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.236 — area de jogo tela cheia (fim parede invisivel)</title>
+<title>Runecast v3.237 — arena cobre topo</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13599,7 +13599,7 @@ R3D.buildArena3D = function() {
     // personagem anda "para fora" dela (paredes invisíveis) e o oponente nasce
     // atrás. Damos folga para a arena exceder um pouco a área jogável.
     const targetW = 7.5;    // largura
-    const targetD = 16.0;   // profundidade (meio-termo: cobre boa parte sem deformar a arte)
+    const targetD = 21.0;   // profundidade: cobre Z[-11,9] visível + folga (elimina faixa preta no topo)
     const sx = targetW / (size.x || 1);
     const sz = targetD / (size.z || 1);
     const sy = Math.min(sx, sz);  // altura: menor escala, p/ não esticar a parede pra cima
