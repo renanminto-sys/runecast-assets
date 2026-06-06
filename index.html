@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.238 — arena atras do timer</title>
+<title>Runecast v3.239 — perspectiva calibrada Smash Balls</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13598,8 +13598,11 @@ R3D.buildArena3D = function() {
     // Z[-11.1,9.0] (~20), centro Z≈-1.07. A arena precisa cobrir isso, senão o
     // personagem anda "para fora" dela (paredes invisíveis) e o oponente nasce
     // atrás. Damos folga para a arena exceder um pouco a área jogável.
-    const targetW = 7.5;    // largura
-    const targetD = 24.0;   // v3.238: mais profundidade — arena sobe atrás do timer/HUD, fechando a faixa preta superior (ok perder um pouco atrás do HUD)
+    // v3.239: dimensionado para a câmera PERSPECTIVA (área visível: topo Z≈-11,
+    // base Z≈2.8, largura ±2 a ±4.6). Arena um pouco maior que a área para
+    // preencher o quadro e "perder" um pouco nas bordas (mais natural).
+    const targetW = 6.5;    // largura (cobre ±2 base / ±4.6 topo, perdendo um pouco)
+    const targetD = 16.0;   // profundidade (cobre Z[-11,2.8] + folga)
     const sx = targetW / (size.x || 1);
     const sz = targetD / (size.z || 1);
     const sy = Math.min(sx, sz);  // altura: menor escala, p/ não esticar a parede pra cima
@@ -13608,7 +13611,7 @@ R3D.buildArena3D = function() {
     const box2 = new THREE.Box3().setFromObject(model);
     model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X em 0
     model.position.z -= (box2.min.z + box2.max.z) / 2;   // centraliza Z
-    model.position.z += -2.5;                            // v3.238: recuo maior — arena sobe atrás do timer/HUD superior
+    model.position.z += -4.0;                            // v3.239: centro da área visível na perspectiva (topo -11, base 2.8)
     model.position.y -= box2.max.y;                      // topo da arena em y=0
     // garante materiais opacos
     model.traverse(o => {
@@ -13640,15 +13643,16 @@ R3D.init = function() {
 
   R3D.scene = new THREE.Scene();
 
-  // v3.234: câmera comutável para calibrar a profundidade Smash Ball.
-  // Padrão: ortográfica (atual). Com ?persp=1 na URL: perspectiva (dá profundidade
-  // real, linhas convergem). Permite comparar as duas no mesmo build.
+  // v3.239: PERSPECTIVA é o padrão agora (dá a profundidade Smash Balls).
+  // ?orto=1 na URL volta à ortográfica (para comparar, se precisar).
   const _params = new URLSearchParams(location.search);
-  R3D.usePerspective = (_params.get('persp') === '1');
+  R3D.usePerspective = (_params.get('orto') !== '1');
   if (R3D.usePerspective) {
-    R3D.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000);
-    R3D.camera.position.set(0, 8, 13);
-    R3D.camera.lookAt(0, 0.5, -1);
+    // v3.239: perspectiva calibrada para enquadrar a arena SEM espaço preto.
+    // Olha mais para baixo (topo da tela cai na arena em Z=-11, não no infinito).
+    R3D.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1000);
+    R3D.camera.position.set(0, 10, 7);
+    R3D.camera.lookAt(0, 0, -2);
   } else {
     R3D.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
     R3D.camera.position.set(0, 9, 11);
