@@ -37,19 +37,21 @@
 <button id="tg">ocultar</button>
 <div id="vals">Ajuste os cortes ate sobrar SO a plataforma retangular. Depois me mande estes valores.</div>
 
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
-<script>
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+window.THREE = THREE;
 const statusEl = document.getElementById('status');
 function showError(msg){ statusEl.innerHTML = msg; statusEl.style.color='#ff7777'; }
 window.addEventListener('error', (e)=>{ showError('ERRO JS: '+e.message); });
-
-if (typeof THREE === 'undefined') {
-  showError('Falha ao carregar Three.js (sem internet?)');
-} else {
-  statusEl.textContent = 'Three.js OK. Carregando arena...';
-  init();
-}
+statusEl.textContent = 'Three.js OK. Carregando arena...';
+init();
 
 function init(){
   const canvas=document.getElementById('c');
@@ -84,10 +86,8 @@ function init(){
 
   let arena=null, normBox=null;
 
-  if (typeof THREE.GLTFLoader === 'undefined') {
-    showError('GLTFLoader nao carregou. (o cubo verde deve girar)');
-  } else {
-    const loader=new THREE.GLTFLoader();
+    {
+    const loader=new GLTFLoader();
     loader.load('arena2_otimizada.glb',function(g){
       arena=g.scene;
       arena.updateMatrixWorld(true);
