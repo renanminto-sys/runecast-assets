@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Runecast v3.241 — limite antes da parede</title>
+<title>Runecast v3.243 — textura nova (cor + lava emissiva)</title>
 <!-- v3.108: Three.js via CDN (importmap). Trocar por local no Capacitor. -->
 <script type="importmap">
 {
@@ -13584,53 +13584,48 @@ R3D.buildArena = function() {
 // na MESMA cena dos magos, então fica coerente com a câmera e o posicionamento.
 R3D.buildArena3D = function() {
   if (R3D.arena3D) { R3D.scene.remove(R3D.arena3D); }
-  // v3.233: carrega o MODELO 3D real da arena (gerado no Meshy) no lugar da
-  // geometria de caixas. Escala para cobrir a área de jogo e posiciona o topo
-  // da plataforma em y=0 (onde os magos andam).
-  const ARENA_URL = 'arena_otimizada.glb';
-  const loader = new GLTFLoader();
-  loader.load(ARENA_URL, (gltf) => {
-    const model = gltf.scene;
-    // mede o tamanho original
-    const box = new THREE.Box3().setFromObject(model);
-    const size = new THREE.Vector3(); box.getSize(size);
-    const center = new THREE.Vector3(); box.getCenter(center);
-    // v3.235: escala para cobrir a ÁREA DE JOGO REAL medida (não valores
-    // arbitrários). Com a câmera atual, o chão visível é X[-3.38,3.37] (~6.75) e
-    // Z[-11.1,9.0] (~20), centro Z≈-1.07. A arena precisa cobrir isso, senão o
-    // personagem anda "para fora" dela (paredes invisíveis) e o oponente nasce
-    // atrás. Damos folga para a arena exceder um pouco a área jogável.
-    // v3.239: dimensionado para a câmera PERSPECTIVA (área visível: topo Z≈-11,
-    // base Z≈2.8, largura ±2 a ±4.6). Arena um pouco maior que a área para
-    // preencher o quadro e "perder" um pouco nas bordas (mais natural).
-    const targetW = 7.2;    // v3.240: um pouco mais larga (era 6.5)
-    const targetD = 16.0;   // profundidade (cobre Z[-11,2.8] + folga)
-    const sx = targetW / (size.x || 1);
-    const sz = targetD / (size.z || 1);
-    const sy = Math.min(sx, sz);  // altura: menor escala, p/ não esticar a parede pra cima
-    model.scale.set(sx, sy, sz);
-    model.updateMatrixWorld(true);
-    const box2 = new THREE.Box3().setFromObject(model);
-    model.position.x -= (box2.min.x + box2.max.x) / 2;   // centraliza X em 0
-    model.position.z -= (box2.min.z + box2.max.z) / 2;   // centraliza Z
-    model.position.z += -4.0;                            // v3.239: centro da área visível na perspectiva (topo -11, base 2.8)
-    model.position.y -= box2.max.y;                      // topo da arena em y=0
-    // garante materiais opacos
-    model.traverse(o => {
-      if (o.isMesh && o.material) {
-        const mats = Array.isArray(o.material) ? o.material : [o.material];
-        mats.forEach(m => { m.side = THREE.FrontSide; m.depthWrite = true; m.needsUpdate = true; });
-      }
-    });
-    R3D.arena3D = model;
-    R3D.scene.add(model);
-    console.log('[3D] arena 3D (modelo) carregada. Escala:', sx.toFixed(2), sy.toFixed(2), sz.toFixed(2));
-  }, undefined, (err) => {
-    console.error('[3D] falha ao carregar arena, usando fundo 2D:', err);
-    const bg = document.getElementById('arena-ruins-bg');
-    if (bg) bg.style.display = '';
+  // v3.242: PLATAFORMA CONSTRUÍDA no código (proporção 100% controlada) +
+  // textura do chão extraída da arte que geramos. Resolve de vez o problema de
+  // proporção (não depende de modelo normalizado). Topo em y=0.
+  const g = new THREE.Group();
+  // proporção controlada por nós: largura x profundidade x espessura
+  const PW = 7.2;    // largura X
+  const PD = 14.0;   // profundidade Z
+  const PH = 1.6;    // espessura
+  const cz = -4.0;   // centro em Z (área visível da perspectiva)
+
+  const texLoader = new THREE.TextureLoader();
+  const floorTex = texLoader.load('textura_chao_arena.png');
+  floorTex.colorSpace = THREE.SRGBColorSpace;
+  floorTex.wrapS = floorTex.wrapT = THREE.ClampToEdgeWrapping;
+  const floorEmissive = texLoader.load('textura_chao_emissivo.png');
+  floorEmissive.colorSpace = THREE.SRGBColorSpace;
+
+  // topo (chão com a textura + lava emissiva separada que brilha)
+  const topMat = new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8, emissive: 0xffffff, emissiveMap: floorEmissive, emissiveIntensity: 0.9 });
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(PW, PD), topMat);
+  top.rotation.x = -Math.PI / 2;
+  top.position.set(0, 0, cz);
+  g.add(top);
+
+  // corpo da plataforma (espessura) — laterais escuras
+  const sideMat = new THREE.MeshStandardMaterial({ color: 0x1a1420, roughness: 1 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(PW, PH, PD), sideMat);
+  body.position.set(0, -PH/2 - 0.01, cz);
+  g.add(body);
+
+  // borda fina brilhante em volta do topo (moldura)
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xff6620, emissive: 0xff4400, emissiveIntensity: 0.8, roughness: 0.5 });
+  const et = 0.12;
+  [[PW+et*2, et, 0, cz+PD/2],[PW+et*2, et, 0, cz-PD/2],[et, PD, -PW/2, cz],[et, PD, PW/2, cz]].forEach(([w,d,x,z]) => {
+    const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), edgeMat);
+    e.position.set(x, 0.04, z); g.add(e);
   });
+
+  R3D.arena3D = g;
+  R3D.scene.add(g);
   R3D.arenaLavas = [];
+  console.log('[3D] plataforma 3D construída com textura do chão');
 };
 
 R3D.init = function() {
