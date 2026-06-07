@@ -8,120 +8,132 @@
   body { margin:0; background:#0a0710; overflow:hidden; font-family:monospace; color:#9f7; }
   #c { display:block; width:100vw; height:100vh; }
   #panel { position:fixed; top:6px; left:6px; right:6px; background:rgba(0,0,0,0.8);
-    padding:6px 8px; border-radius:8px; font-size:11px; z-index:10; max-height:46vh; overflow:auto; }
+    padding:6px 8px; border-radius:8px; font-size:11px; z-index:10; max-height:42vh; overflow:auto; }
   .row { display:flex; align-items:center; gap:6px; margin:2px 0; }
   .row label { width:96px; flex-shrink:0; }
   .row input { flex:1; } .row span { width:46px; text-align:right; color:#fff; flex-shrink:0; }
   #vals { position:fixed; bottom:6px; left:6px; right:6px; background:rgba(0,40,0,0.85);
-    padding:8px; border-radius:8px; font-size:11px; z-index:10; color:#aiff9f; white-space:pre-wrap; }
+    padding:8px; border-radius:8px; font-size:11px; z-index:10; color:#cfffcf; white-space:pre-wrap; }
+  #status { position:fixed; top:50%; left:0; right:0; text-align:center; color:#fc7; font-size:14px; z-index:5; padding:0 20px; }
   h4 { margin:4px 0 2px; color:#fc7; }
-  #tg { position:fixed; bottom:74px; right:8px; z-index:11; background:#222; color:#9f7; border:1px solid #9f7; border-radius:6px; padding:6px 10px; font-family:monospace; }
+  #tg { position:fixed; bottom:78px; right:8px; z-index:11; background:#222; color:#9f7; border:1px solid #9f7; border-radius:6px; padding:6px 10px; font-family:monospace; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="status">Carregando Three.js...</div>
 <div id="panel">
   <h4>CORTE (remove as pedras de enfeite)</h4>
   <div class="row"><label>corte esq X</label><input id="cutMinX" type="range" min="-1" max="0" step="0.02" value="-1"><span id="cutMinXv">-1</span></div>
   <div class="row"><label>corte dir X</label><input id="cutMaxX" type="range" min="0" max="1" step="0.02" value="1"><span id="cutMaxXv">1</span></div>
   <div class="row"><label>corte frente Z</label><input id="cutMaxZ" type="range" min="0" max="1" step="0.02" value="1"><span id="cutMaxZv">1</span></div>
   <div class="row"><label>corte fundo Z</label><input id="cutMinZ" type="range" min="-1" max="0" step="0.02" value="-1"><span id="cutMinZv">-1</span></div>
-  <h4>CÂMERA</h4>
+  <h4>CAMERA</h4>
   <div class="row"><label>cam altura</label><input id="camY" type="range" min="3" max="14" step="0.5" value="10"><span id="camYv">10</span></div>
   <div class="row"><label>cam dist</label><input id="camZ" type="range" min="4" max="16" step="0.5" value="7"><span id="camZv">7</span></div>
   <div class="row"><label>FOV</label><input id="fov" type="range" min="25" max="60" step="1" value="38"><span id="fovv">38</span></div>
   <div class="row"><label>olhar Z</label><input id="lookZ" type="range" min="-6" max="2" step="0.5" value="-2"><span id="lookZv">-2</span></div>
 </div>
 <button id="tg">ocultar</button>
-<div id="vals">Ajuste os cortes até sobrar SÓ a plataforma retangular (sem as pedras). Depois me mande estes valores.</div>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+<div id="vals">Ajuste os cortes ate sobrar SO a plataforma retangular. Depois me mande estes valores.</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+const statusEl = document.getElementById('status');
+function showError(msg){ statusEl.innerHTML = msg; statusEl.style.color='#ff7777'; }
+window.addEventListener('error', (e)=>{ showError('ERRO JS: '+e.message); });
+
+if (typeof THREE === 'undefined') {
+  showError('Falha ao carregar Three.js (sem internet?)');
+} else {
+  statusEl.textContent = 'Three.js OK. Carregando arena...';
+  init();
+}
+
+function init(){
+  const canvas=document.getElementById('c');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.localClippingEnabled=true;
+  const scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x0b0814);
+  scene.add(new THREE.AmbientLight(0x8877aa,1.0));
+  const key=new THREE.DirectionalLight(0xfff2e0,1.4); key.position.set(5,12,6); scene.add(key);
+  const fill=new THREE.DirectionalLight(0x88aaff,0.5); fill.position.set(-5,4,-3); scene.add(fill);
+
+  const refCube=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshStandardMaterial({color:0x44ff88}));
+  refCube.position.set(0,0.25,3); scene.add(refCube);
+
+  const els={};
+  ['cutMinX','cutMaxX','cutMaxZ','cutMinZ','camY','camZ','fov','lookZ'].forEach(id=>els[id]=document.getElementById(id));
+
+  let camera;
+  function makeCam(){ camera=new THREE.PerspectiveCamera(+els.fov.value, innerWidth/innerHeight, 0.1, 1000); updateCam(); }
+  function updateCam(){ if(!camera)return; camera.fov=+els.fov.value; camera.aspect=innerWidth/innerHeight;
+    camera.position.set(0,+els.camY.value,+els.camZ.value); camera.lookAt(0,0,+els.lookZ.value); camera.updateProjectionMatrix(); }
+  makeCam();
+
+  const clipPlanes=[
+    new THREE.Plane(new THREE.Vector3(1,0,0), 0),
+    new THREE.Plane(new THREE.Vector3(-1,0,0), 0),
+    new THREE.Plane(new THREE.Vector3(0,0,1), 0),
+    new THREE.Plane(new THREE.Vector3(0,0,-1), 0)
+  ];
+
+  let arena=null, normBox=null;
+
+  if (typeof THREE.GLTFLoader === 'undefined') {
+    showError('GLTFLoader nao carregou. (o cubo verde deve girar)');
+  } else {
+    const loader=new THREE.GLTFLoader();
+    loader.load('arena2_otimizada.glb',function(g){
+      arena=g.scene;
+      arena.updateMatrixWorld(true);
+      const box=new THREE.Box3().setFromObject(arena);
+      const size=new THREE.Vector3(); box.getSize(size);
+      const center=new THREE.Vector3(); box.getCenter(center);
+      const s=6/(size.x||1); arena.scale.setScalar(s);
+      arena.position.x -= center.x*s; arena.position.y -= center.y*s; arena.position.z -= center.z*s;
+      arena.updateMatrixWorld(true);
+      arena.traverse(function(o){ if(o.isMesh){ var mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(function(m){ m.clippingPlanes=clipPlanes; m.side=THREE.DoubleSide; }); }});
+      normBox=new THREE.Box3().setFromObject(arena);
+      scene.add(arena);
+      scene.remove(refCube);
+      statusEl.style.display='none';
+      updateClips();
+    }, function(p){ statusEl.textContent='Carregando arena... '+(p.total?Math.round(p.loaded/p.total*100):'')+'%'; },
+    function(err){ showError('ERRO ao carregar GLB:<br>'+(err && err.message ? err.message : err)+'<br>(arena2_otimizada.glb na mesma pasta?)'); });
   }
+
+  function updateClips(){
+    if(!arena||!normBox) return;
+    const size=new THREE.Vector3(); normBox.getSize(size);
+    const halfX=size.x/2, halfZ=size.z/2;
+    clipPlanes[0].constant=-((+els.cutMinX.value)*halfX);
+    clipPlanes[1].constant=((+els.cutMaxX.value)*halfX);
+    clipPlanes[2].constant=-((+els.cutMinZ.value)*halfZ);
+    clipPlanes[3].constant=((+els.cutMaxZ.value)*halfZ);
+    document.getElementById('vals').textContent =
+      'CORTE (fracao da arena, -1 a 1):\n'+
+      '  X: '+(+els.cutMinX.value).toFixed(2)+' a '+(+els.cutMaxX.value).toFixed(2)+'\n'+
+      '  Z: '+(+els.cutMinZ.value).toFixed(2)+' a '+(+els.cutMaxZ.value).toFixed(2)+'\n'+
+      'CAMERA: altura '+els.camY.value+', dist '+els.camZ.value+', FOV '+els.fov.value+', olhar Z '+els.lookZ.value+'\n'+
+      '>> Me mande este bloco <<';
+  }
+
+  Object.values(els).forEach(function(el){ el.addEventListener('input',function(){
+    document.getElementById(el.id+'v').textContent=el.value;
+    updateClips(); updateCam();
+  });});
+  document.getElementById('tg').addEventListener('click',function(){var p=document.getElementById('panel');p.style.display=p.style.display==='none'?'block':'none';});
+  addEventListener('resize',function(){makeCam();renderer.setSize(innerWidth,innerHeight);});
+
+  function loop(){ requestAnimationFrame(loop); refCube.rotation.y+=0.02; renderer.render(scene,camera); }
+  loop();
 }
-</script>
-<script type="module">
-import * as THREE from 'three';
-import { GLTFLoader as GLTF } from 'three/addons/loaders/GLTFLoader.js';
-
-const canvas=document.getElementById('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x0b0814);
-scene.add(new THREE.AmbientLight(0x8877aa,0.9));
-const key=new THREE.DirectionalLight(0xfff2e0,1.4); key.position.set(5,12,6); scene.add(key);
-const fill=new THREE.DirectionalLight(0x88aaff,0.5); fill.position.set(-5,4,-3); scene.add(fill);
-
-const els={};
-['cutMinX','cutMaxX','cutMaxZ','cutMinZ','camY','camZ','fov','lookZ'].forEach(id=>els[id]=document.getElementById(id));
-
-let camera;
-function makeCam(){ camera=new THREE.PerspectiveCamera(+els.fov.value, innerWidth/innerHeight, 0.1, 1000); updateCam(); }
-function updateCam(){ camera.fov=+els.fov.value; camera.aspect=innerWidth/innerHeight;
-  camera.position.set(0,+els.camY.value,+els.camZ.value); camera.lookAt(0,0,+els.lookZ.value); camera.updateProjectionMatrix(); }
-
-let arena, arenaBox;
-// planos de corte
-const clipPlanes=[
-  new THREE.Plane(new THREE.Vector3(1,0,0), 0),  // corte esquerda (x > minX)
-  new THREE.Plane(new THREE.Vector3(-1,0,0), 0), // corte direita (x < maxX)
-  new THREE.Plane(new THREE.Vector3(0,0,1), 0),  // corte fundo (z > minZ)
-  new THREE.Plane(new THREE.Vector3(0,0,-1), 0), // corte frente (z < maxZ)
-];
-renderer.localClippingEnabled=true;
-
-const loader=new GLTF();
-loader.load('arena2_otimizada.glb',(g)=>{
-  arena=g.scene;
-  arena.updateMatrixWorld(true);
-  arenaBox=new THREE.Box3().setFromObject(arena);
-  const size=new THREE.Vector3(); arenaBox.getSize(size);
-  const center=new THREE.Vector3(); arenaBox.getCenter(center);
-  // normaliza: centraliza e escala pra largura ~6
-  const s=6/size.x; arena.scale.setScalar(s);
-  arena.position.sub(center.multiplyScalar(s));
-  arena.updateMatrixWorld(true);
-  // aplica clipping aos materiais
-  arena.traverse(o=>{ if(o.isMesh){ const mats=Array.isArray(o.material)?o.material:[o.material];
-    mats.forEach(m=>{ m.clippingPlanes=clipPlanes; m.clipIntersection=false; }); }});
-  // guarda escala/box normalizados pra mostrar valores reais
-  window.__arenaScale=s; window.__arenaBox=new THREE.Box3().setFromObject(arena);
-  updateClips();
-},undefined,(e)=>{ document.getElementById('vals').textContent='ERRO ao carregar arena: '+e; });
-
-function updateClips(){
-  if(!arena) return;
-  const b=window.__arenaBox; const size=new THREE.Vector3(); b.getSize(size);
-  const halfX=size.x/2, halfZ=size.z/2;
-  // sliders -1..1 mapeiam pras bordas
-  const minX=(+els.cutMinX.value)*halfX, maxX=(+els.cutMaxX.value)*halfX;
-  const minZ=(+els.cutMinZ.value)*halfZ, maxZ=(+els.cutMaxZ.value)*halfZ;
-  clipPlanes[0].constant=-minX;  // x>minX
-  clipPlanes[1].constant=maxX;   // x<maxX
-  clipPlanes[2].constant=-minZ;  // z>minZ
-  clipPlanes[3].constant=maxZ;   // z<maxZ
-  // mostra valores normalizados (fração) pra eu aplicar no jogo
-  document.getElementById('vals').textContent =
-    'CORTE (fração da arena, -1 a 1):\n'+
-    `  X: ${(+els.cutMinX.value).toFixed(2)} a ${(+els.cutMaxX.value).toFixed(2)}  (largura usada: ${(((+els.cutMaxX.value)-(+els.cutMinX.value))/2*100).toFixed(0)}%)\n`+
-    `  Z: ${(+els.cutMinZ.value).toFixed(2)} a ${(+els.cutMaxZ.value).toFixed(2)}\n`+
-    `CÂMERA: altura ${els.camY.value}, dist ${els.camZ.value}, FOV ${els.fov.value}, olhar Z ${els.lookZ.value}\n`+
-    '>> Me mande este bloco quando a plataforma estiver recortada certa <<';
-}
-
-Object.values(els).forEach(el=>el.addEventListener('input',()=>{
-  document.getElementById(el.id+'v').textContent=el.value;
-  updateClips(); updateCam();
-}));
-document.getElementById('tg').addEventListener('click',()=>{const p=document.getElementById('panel');p.style.display=p.style.display==='none'?'block':'none';});
-addEventListener('resize',()=>{makeCam();renderer.setSize(innerWidth,innerHeight);});
-
-makeCam(); renderer.setSize(innerWidth,innerHeight);
-function loop(){ requestAnimationFrame(loop); renderer.render(scene,camera); }
-loop();
 </script>
 </body>
 </html>
